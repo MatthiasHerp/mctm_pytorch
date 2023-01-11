@@ -7,8 +7,8 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 
-def objective(y, mctm, avg = True):
-    z, log_d = mctm(y)
+def objective(y, model, avg = True):
+    z, log_d = model(y)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())
@@ -19,13 +19,13 @@ def objective(y, mctm, avg = True):
         loss = - log_likelihood_latent.sum() - log_d.sum()
     return loss
 
-def optimize(y, mctm, objective, iterations = 2000, verbose=True):
-    opt                 = optim.Adam(mctm.parameters(), lr = 1e-2)
+def optimize(y, model, objective, iterations = 2000, verbose=True):
+    opt                 = optim.Adam(model.parameters(), lr = 1e-2)
     scheduler           = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.8)
     neg_log_likelihoods = []
     for _ in tqdm(range(iterations)):
         opt.zero_grad() # zero out gradients first on the optimizer
-        neg_log_likelihood = objective(y, mctm) # use the `objective` function
+        neg_log_likelihood = objective(y, model) # use the `objective` function
         neg_log_likelihood.backward() # backpropagate the loss
         opt.step()
         scheduler.step()
@@ -35,25 +35,25 @@ def optimize(y, mctm, objective, iterations = 2000, verbose=True):
 
     return neg_log_likelihoods
 
-#def optimize(y, mctm, objective, iterations = 2000):
-#    opt = torch.optim.LBFGS(mctm.parameters())
+#def optimize(y, model, objective, iterations = 2000):
+#    opt = torch.optim.LBFGS(model.parameters())
 #
 #    def closure():
 #        opt.zero_grad()
-#        neg_log_likelihood = objective(y, mctm) # use the `objective` function
+#        neg_log_likelihood = objective(y, model) # use the `objective` function
 #        neg_log_likelihood.backward() # backpropagate the loss
 #        return neg_log_likelihood
 #
 #    neg_log_likelihoods = []
 #    for _ in tqdm(range(iterations)):
-#        neg_log_likelihood = objective(y, mctm)
+#        neg_log_likelihood = objective(y, model)
 #        opt.step(closure)
 #        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
 #    return neg_log_likelihoods
 
-def train(mctm, train_data, iterations=2000, verbose=True):
+def train(model, train_data, iterations=2000, verbose=True):
 
-    neg_log_likelihoods = optimize(train_data, mctm, objective, iterations = iterations, verbose=verbose) # Run training
+    neg_log_likelihoods = optimize(train_data, model, objective, iterations = iterations, verbose=verbose) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
     with sns.axes_style('ticks'):
@@ -63,7 +63,7 @@ def train(mctm, train_data, iterations=2000, verbose=True):
     sns.despine(trim = True)
 
 
-def evaluate(mctm):
+def evaluate(model):
     p_source = Normal(0, 1)
     p_target = Laplace(5, 3)
     x_true   = p_target.sample((2000, 2)) # samples to compare to
@@ -72,7 +72,7 @@ def evaluate(mctm):
     z = p_source.sample((2000, 2))
 
     # Use our trained model get samples from the target distribution
-    x_flow, log_d = mctm.forward(z, inverse=True)
+    x_flow, log_d = model.forward(z, inverse=True)
 
     # Plot histogram of training samples `x` and generated samples `x_flow` to compare the two.
     with sns.axes_style('ticks'):
