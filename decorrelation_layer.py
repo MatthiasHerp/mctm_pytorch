@@ -7,7 +7,7 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 
-def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range):
+def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, inverse=False):
 
     #steps
     output = input.clone()
@@ -22,18 +22,21 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
             #print(params_index)
 
             # compute lambda fct value using before variable
-            lambda_value = bernstein_prediction(params[:, params_index], input[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+            if inverse:
+                lambda_value = bernstein_prediction(params[:, params_index], output[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+            else:
+                lambda_value = bernstein_prediction(params[:, params_index], input[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
 
             # update
             # Cloning issue?
-            output[:,var_num] = output[:,var_num] + lambda_value * input[:,covar_num]
+            if inverse:
+                output[:,var_num] = output[:,var_num] - lambda_value * output[:,covar_num]
+            else:
+                output[:,var_num] = output[:,var_num] + lambda_value * input[:,covar_num]
 
             params_index += 1
 
     return output
-
-def inv_multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range):
-    return 2
 
 class Decorrelation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range):
@@ -55,7 +58,7 @@ class Decorrelation(nn.Module):
         if not inverse:
             output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range)
         else:
-            output = inv_multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range)
+            output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=True)
         return output, log_d
 
     #def __repr__(self):
