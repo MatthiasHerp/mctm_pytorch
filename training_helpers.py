@@ -19,37 +19,66 @@ def objective(y, model, avg = True):
         loss = - log_likelihood_latent.sum() - log_d.sum()
     return loss
 
-def optimize(y, model, objective, iterations = 2000, verbose=True):
-    opt                 = optim.Adam(model.parameters(), lr = 1e-2)
-    scheduler           = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.8)
-    neg_log_likelihoods = []
-    for _ in tqdm(range(iterations)):
-        opt.zero_grad() # zero out gradients first on the optimizer
+class EarlyStopper:
+    def __init__(self, patience=1, min_delta=0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.min_loss = np.inf
+
+    def early_stop(self, current_loss):
+        if current_loss < self.min_loss:
+            self.min_loss = current_loss
+            self.counter = 0
+
+        elif np.allclose(current_loss,self.min_loss,self.min_delta):
+            self.counter += 1
+
+            if self.counter >= self.patience:
+                return True
+        return False
+
+#def optimize(y, model, objective, iterations = 2000, verbose=True):
+#    opt                 = optim.Adam(model.parameters(), lr = 1e-2)
+#    scheduler           = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.8)
+#    neg_log_likelihoods = []
+#    for _ in tqdm(range(iterations)):
+#        opt.zero_grad() # zero out gradients first on the optimizer
+#        neg_log_likelihood = objective(y, model) # use the `objective` function
+#        neg_log_likelihood.backward() # backpropagate the loss
+#        opt.step()
+#        scheduler.step()
+#        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
+#        if verbose:
+#            print(neg_log_likelihood.item())
+#
+#    return neg_log_likelihoods
+
+def optimize(y, model, objective, iterations = 2000, verbose=False):
+    opt = torch.optim.LBFGS(model.parameters(), history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
+
+    def closure():
+        opt.zero_grad()
         neg_log_likelihood = objective(y, model) # use the `objective` function
         neg_log_likelihood.backward() # backpropagate the loss
-        opt.step()
-        scheduler.step()
+        return neg_log_likelihood
+
+    early_stopper = EarlyStopper(patience=5, min_delta=1)
+
+    neg_log_likelihoods = []
+    for _ in tqdm(range(iterations)):
+        neg_log_likelihood = objective(y, model)
+        opt.step(closure)
         neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
+
         if verbose:
             print(neg_log_likelihood.item())
 
-    return neg_log_likelihoods
+        if early_stopper.early_stop(neg_log_likelihood.detach().numpy()):
+            print("Early Stop!")
+            break
 
-#def optimize(y, model, objective, iterations = 2000):
-#    opt = torch.optim.LBFGS(model.parameters())
-#
-#    def closure():
-#        opt.zero_grad()
-#        neg_log_likelihood = objective(y, model) # use the `objective` function
-#        neg_log_likelihood.backward() # backpropagate the loss
-#        return neg_log_likelihood
-#
-#    neg_log_likelihoods = []
-#    for _ in tqdm(range(iterations)):
-#        neg_log_likelihood = objective(y, model)
-#        opt.step(closure)
-#        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
-#    return neg_log_likelihoods
+    return neg_log_likelihoods
 
 def train(model, train_data, iterations=2000, verbose=True):
 
