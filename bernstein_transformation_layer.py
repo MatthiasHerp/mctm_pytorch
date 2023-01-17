@@ -27,7 +27,11 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
 
         params_restricted = params_a.clone()
         #relu_obj = nn.ReLU()
-        params_restricted[1:] = torch.matmul(torch.exp(params_a[1:]),torch.triu(torch.ones(degree,degree))) + params_a[1] #abs or exp
+        params_restricted[1:] = torch.matmul(torch.exp(params_a[1:]),torch.triu(torch.ones(degree,degree))) + params_a[0] #abs or exp
+        #.double() otherwise I started getting the folowing error:
+        #{RuntimeError}Expected object of scalar type Double but got scalar type Float for argument #2 'mat2' in call to _th_mm
+        #alternativ set dtype=torch.float64 in torch.ones(degree,degree)
+
         # cannot use exp as it destabilizes the optimisation using LBFGS, get inf for params fast?
         # however with exp works really well and fast with adam
         # Relu works for both, results are good except at lower end there is a cutoff somehow
@@ -39,10 +43,17 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
     input_a = (input_a - polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
     if derivativ == 0:
-        return sum(params_restricted[v] * b(torch.FloatTensor([v]), torch.FloatTensor([n]), input_a) for v in range(n+1)) #before we had: params_restricted[v-1]
+        output = sum(params_restricted[v] * b(torch.FloatTensor([v]), torch.FloatTensor([n]), input_a) for v in range(n+1)) #before we had: params_restricted[v-1]
+
+        return output
+        #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
+
     elif derivativ == 1:
-        return sum(params_restricted[v] * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), input_a) -
+        output = sum(params_restricted[v] * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), input_a) -
                                     b(torch.FloatTensor([v]), torch.FloatTensor([n-1]), input_a)) for v in range(n+1))
+
+        return output
+        #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
 def multivariable_bernstein_prediction(input, degree, number_variables, params, polynomial_range, monotonically_increasing, derivativ=0):
     # input dims: 0: observation number, 1: variable
@@ -52,6 +63,16 @@ def multivariable_bernstein_prediction(input, degree, number_variables, params, 
         output[:,var_num] = bernstein_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ)
     return output
 
+def compute_starting_values_berstein_polynomials(degree,min,max):
+    par_restricted_opt = torch.tensor(np.linspace(min,max,degree+1))
+    par_unristricted = par_restricted_opt
+    par_unristricted[1:] = torch.log(par_restricted_opt[1:] - par_restricted_opt[:-1])#torch.diff(par_restricted_opt[1:]))
+
+    par_restricted_opt = torch.Tensor.repeat(par_unristricted,(3,1)).T
+    #par_restricted_opt = torch.reshape(par_restricted_opt,(degree+1,3))
+
+    return torch.tensor(par_restricted_opt,dtype=torch.float32)
+
 class Transformation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range):
         super().__init__()
@@ -59,10 +80,11 @@ class Transformation(nn.Module):
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
         # param dims: 0: basis, 1: variable
-        p = torch.FloatTensor(np.repeat(np.repeat(1,self.degree+1),self.number_variables))
-        self.params = nn.Parameter(torch.reshape(p,(self.degree+1, self.number_variables)))
+        self.params = nn.Parameter(compute_starting_values_berstein_polynomials(10,
+                                                                                polynomial_range[0,0],
+                                                                                polynomial_range[1,0]))
 
-    def forward(self, input, log_d = 0, inverse = False, monotonically_increasing = True):
+    def forward(self, input, log_d = 0, inverse = False, monotonically_increasing = True, return_log_d = False):
         # input dims: 0: observation number, 1: variable
         if not inverse:
             output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing)
@@ -71,8 +93,10 @@ class Transformation(nn.Module):
         else:
             output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params_inverse, self.polynomial_range_inverse, monotonically_increasing=False)
 
-
-        return output, log_d
+        if return_log_d==True:
+            return output, log_d
+        else:
+            return output
 
     def approximate_inverse(self, input, polynomial_range_inverse, iterations=4000):
         # optimization using linespace data and the forward berstein polynomial?

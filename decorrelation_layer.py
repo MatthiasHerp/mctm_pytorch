@@ -65,12 +65,17 @@ class Decorrelation(nn.Module):
         else:
             self.params = nn.Parameter(torch.reshape(p,(self.degree+1, int(self.num_lambdas))))
 
-    def forward(self, input, log_d = 0, inverse = False):
+    def forward(self, input, log_d = 0, inverse = False, return_log_d = False):
+
         if not inverse:
             output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=False, spline=self.spline)
         else:
             output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=True, spline=self.spline)
-        return output, log_d
+
+        if return_log_d==True:
+            return output, log_d
+        else:
+            return output
 
     #def __repr__(self):
     #    return "Affine(alpha={alpha:.2f}, beta={beta:.2f})".format(alpha = self.alpha[0], beta = self.beta[0])

@@ -8,7 +8,7 @@ from tqdm import tqdm
 import seaborn as sns
 
 def objective(y, model, avg = True):
-    z, log_d = model(y)
+    z, log_d = model(y, return_log_d = True)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())
@@ -54,7 +54,7 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, iterations = 2000, verbose=False):
+def optimize(y, model, objective, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
     opt = torch.optim.LBFGS(model.parameters(), history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
@@ -63,7 +63,7 @@ def optimize(y, model, objective, iterations = 2000, verbose=False):
         neg_log_likelihood.backward() # backpropagate the loss
         return neg_log_likelihood
 
-    early_stopper = EarlyStopper(patience=5, min_delta=1)
+    early_stopper = EarlyStopper(patience=patience, min_delta=min_delta)
 
     neg_log_likelihoods = []
     for _ in tqdm(range(iterations)):
@@ -80,9 +80,9 @@ def optimize(y, model, objective, iterations = 2000, verbose=False):
 
     return neg_log_likelihoods
 
-def train(model, train_data, iterations=2000, verbose=True):
+def train(model, train_data, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
 
-    neg_log_likelihoods = optimize(train_data, model, objective, iterations = iterations, verbose=verbose) # Run training
+    neg_log_likelihoods = optimize(train_data, model, objective, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
     with sns.axes_style('ticks'):
