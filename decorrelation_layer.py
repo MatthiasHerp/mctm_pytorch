@@ -49,12 +49,13 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
     return output
 
 class Decorrelation(nn.Module):
-    def __init__(self, degree, number_variables, polynomial_range):
+    def __init__(self, degree, number_variables, polynomial_range, spline="bspline"):
         super().__init__()
         self.degree  = degree
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
         self.num_lambdas = number_variables * (number_variables-1) / 2
+        self.spline = spline
         # https://discuss.pytorch.org/t/how-to-turn-list-of-varying-length-tensor-into-a-tensor/1361
         # param dims: 0: basis, 1: variable
         p = torch.FloatTensor(np.repeat(np.repeat(0.1,self.degree+1), self.num_lambdas))
@@ -66,9 +67,9 @@ class Decorrelation(nn.Module):
 
     def forward(self, input, log_d = 0, inverse = False):
         if not inverse:
-            output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range)
+            output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=False, spline=self.spline)
         else:
-            output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=True)
+            output = multivariable_lambda_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, inverse=True, spline=self.spline)
         return output, log_d
 
     #def __repr__(self):

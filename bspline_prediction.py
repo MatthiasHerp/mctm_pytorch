@@ -6,7 +6,7 @@ from bspline.BSpline import BSpline as Bspline
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0):
 
     params_restricted = params_a.clone()
-    n = degree
+    n = degree + 1
 
     bspline = Bspline(start=polynomial_range[0], end=polynomial_range[1], n_bases=n, spline_order=3)
     bspline_basis_matrix = bspline.predict(input_a)
