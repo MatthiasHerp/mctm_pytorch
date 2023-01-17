@@ -5,6 +5,16 @@ from training_helpers import *
 
 
 if __name__ == '__main__':
+    from scipy.interpolate import BSpline
+
+    k = 2
+    t = [0, 1, 2, 3, 4, 5, 6]
+    c = [-1, 2, 0, -1]
+
+    data = np.array(range(100))
+
+    spl = BSpline(t, c, k)
+    spl(data)
 
     y_distribution = Laplace(5, 3)
     y = y_distribution.sample((2000,2)) # Generate training data

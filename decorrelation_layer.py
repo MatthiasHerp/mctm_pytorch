@@ -7,8 +7,9 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 from bernstein_transformation_layer import bernstein_prediction
+from bspline_prediction import bspline_prediction
 
-def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, inverse=False):
+def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, inverse=False, spline="bspline"):
 
     #steps
     output = input.clone()
@@ -24,9 +25,17 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
             # compute lambda fct value using before variable
             if inverse:
-                lambda_value = bernstein_prediction(params[:, params_index], output[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+                #output into spline
+                if spline == "bspline":
+                    lambda_value = bspline_prediction(params[:, params_index], output[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+                elif spline == "bernstein":
+                    lambda_value = bernstein_prediction(params[:, params_index], output[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
             else:
-                lambda_value = bernstein_prediction(params[:, params_index], input[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+                #input into spline
+                if spline == "bspline":
+                    lambda_value = bspline_prediction(params[:, params_index], input[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
+                elif spline == "bernstein":
+                    lambda_value = bernstein_prediction(params[:, params_index], input[:,covar_num], degree, polynomial_range[:,covar_num], monotonically_increasing=False, derivativ=0)
 
             # update
             # Cloning issue?
