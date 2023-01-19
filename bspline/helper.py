@@ -37,17 +37,17 @@ def get_X_spline(x, knots, n_bases=5, spline_order=3, add_intercept=True):
         raise ValueError("x has to be 1 dimentional")
     tck = [knots, torch.zeros(n_bases), spline_order]
     X = torch.zeros([len(x), n_bases], dtype=torch.float32)
-    x = x.cpu().numpy()  # ODO: tensor interpolation?
+    x = x.cpu().detach().numpy()  # ODO: tensor interpolation? -->detach()
     for i in range(n_bases):
         vec = torch.zeros(n_bases, dtype=torch.float32)
         vec[i] = 1.0
         tck[1] = vec
         if cuda:
-            X[:, i] = torch.from_numpy(si.splev(x, tck, der=0)).to(
+            X[:, i] = torch.from_numpy(si.splev(x, tck, der=0)).to( #added .detach().numpy()
                 "cuda"
             )  # ODO: specify cuda number
         else:
-            X[:, i] = torch.from_numpy(si.splev(x, tck, der=0))
+            X[:, i] = torch.from_numpy(si.splev(x, tck, der=0)) #added .detach().numpy()
     if add_intercept is True:
         ones = torch.ones_like(X[:, :1])
         X = torch.hstack([ones, X])

@@ -59,7 +59,7 @@ def optimize(y, model, objective, iterations = 2000, verbose=False, patience=5, 
 
     def closure():
         opt.zero_grad()
-        neg_log_likelihood = objective(y, model) # use the `objective` function
+        neg_log_likelihood = objective(y, model)# use the `objective` function
         neg_log_likelihood.backward() # backpropagate the loss
         return neg_log_likelihood
 

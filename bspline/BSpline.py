@@ -38,7 +38,7 @@ class BSpline:
 
         self.knots = get_knots(self.start, self.end, self.n_bases, self.spline_order)
 
-        self.S = get_S(self.n_bases, self.spline_order, add_intercept=False)
+        #self.S = get_S(self.n_bases, self.spline_order, add_intercept=False)
 
     def __repr__(self):
         return "BSpline(start={0}, end={1}, n_bases={2}, spline_order={3})".format(

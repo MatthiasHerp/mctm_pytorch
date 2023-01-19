@@ -64,14 +64,14 @@ def multivariable_bernstein_prediction(input, degree, number_variables, params, 
     return output
 
 def compute_starting_values_berstein_polynomials(degree,min,max):
-    par_restricted_opt = torch.tensor(np.linspace(min,max,degree+1))
+    par_restricted_opt = torch.tensor(np.linspace(min,max,degree+1), dtype=torch.float32)
     par_unristricted = par_restricted_opt
     par_unristricted[1:] = torch.log(par_restricted_opt[1:] - par_restricted_opt[:-1])#torch.diff(par_restricted_opt[1:]))
 
     par_restricted_opt = torch.Tensor.repeat(par_unristricted,(3,1)).T
     #par_restricted_opt = torch.reshape(par_restricted_opt,(degree+1,3))
 
-    return torch.tensor(par_restricted_opt,dtype=torch.float32)
+    return par_restricted_opt
 
 class Transformation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range):

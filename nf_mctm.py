@@ -7,17 +7,17 @@ from decorrelation_layer import Decorrelation
 
 
 class NF_MCTM(nn.Module):
-    def __init__(self, polynomial_range, number_variables):
+    def __init__(self, polynomial_range, number_variables, spline_decorrelation="bernstein", calc_method="torch_bspline"):
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
 
         self.l1 = Transformation(degree=10, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3))
-        self.l2 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline="bernstein")
+        self.l2 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation, calc_method=calc_method)
         self.l3 = Flip()
-        self.l4 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline="bernstein")
+        self.l4 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation, calc_method=calc_method)
         self.l5 = Flip()
-        self.l6 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline="bernstein")
+        self.l6 = Decorrelation(degree=12, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation, calc_method=calc_method)
 
 
     def forward(self, x, return_log_d=False):
