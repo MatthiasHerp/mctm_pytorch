@@ -74,7 +74,16 @@ class deBoor():
         self.p=p
         self.n = t.size(0) - 2 * self.p
 
-    def compute(self, x, k):
+    def compute_k(self, x):
+
+        k = torch.searchsorted(self.t, x) - 1
+        k[k > (self.n - 1)] = 2 + 1
+        k[k > (self.n - 1)] = 2 + (self.n - 1) - 1
+
+        return k
+
+
+    def compute_prediction(self, x, k):
         """Evaluates S(x).
 
         Arguments
@@ -99,14 +108,15 @@ import functorch
 
 def run_deBoor(x, t, c, p):
     deBoor_obj = deBoor(t=t, c=c, p=p, x=x)
-    deBorr_vec = functorch.vmap(deBoor_obj.compute)
+    deBorr_func_vectorized = functorch.vmap(deBoor_obj.compute_prediction)
 
-    k = torch.searchsorted(t, x) - 1
-    n = t.size(0) - 2 * 2
-    k[k > (n - 1)] = 2 + 1
-    k[k > (n - 1)] = 2 + (n - 1) - 1
-
-    return deBorr_vec(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
+    #k = torch.searchsorted(t, x) - 1
+    #n = t.size(0) - 2 * 2
+    #k[k > (n - 1)] = 2 + 1
+    #k[k > (n - 1)] = 2 + (n - 1) - 1
+    k = deBoor_obj.compute_k(x)
+#
+    return deBorr_func_vectorized(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
 
 from bspline.spline_utils import torch_cr_spl_predict as torch_cr_spl_predict
 def cubic_bspline(x, knots, F, S):

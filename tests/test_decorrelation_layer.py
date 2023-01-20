@@ -18,6 +18,13 @@ if __name__ == '__main__':
     y = y.reshape((2000, 3))
     y.size()
 
+    sns.kdeplot(x=y[:, 0], y=y[:, 1])
+    plt.show()
+    sns.kdeplot(x=y[:, 0], y=y[:, 2])
+    plt.show()
+    sns.kdeplot(x=y[:, 1], y=y[:, 2])
+    plt.show()
+
     polynomial_range = torch.FloatTensor([[-15, -15, -15],
                                           [15, 15, 15]])
     decorr = Decorrelation(degree=12,
