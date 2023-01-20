@@ -67,6 +67,47 @@ def deBoor(x, t, c, p):
 
     return pred
 
+class deBoor():
+    def __init__(self,t,c,p,x):
+        self.t=t
+        self.c=c
+        self.p=p
+        self.n = t.size(0) - 2 * self.p
+
+    def compute(self, x, k):
+        """Evaluates S(x).
+
+        Arguments
+        ---------
+        k: Index of knot interval that contains x.
+        x: Position.
+        t: Array of knot positions, needs to be padded as described above.
+        c: Array of control points.
+        p: Degree of B-spline.
+        """
+
+        d = [self.c[j + k - self.p] for j in range(0, self.p + 1)]
+
+        for r in range(1, self.p + 1):
+            for j in range(self.p, r - 1, -1):
+                alpha = (x - self.t[j + k - self.p]) / (self.t[j + 1 + k - r] - self.t[j + k - self.p])
+                d[j] = (1.0 - alpha) * d[j - 1] + alpha * d[j]
+
+        return d[self.p]
+
+import functorch
+
+def run_deBoor(x, t, c, p):
+    deBoor_obj = deBoor(t=t, c=c, p=p, x=x)
+    deBorr_vec = functorch.vmap(deBoor_obj.compute)
+
+    k = torch.searchsorted(t, x) - 1
+    n = t.size(0) - 2 * 2
+    k[k > (n - 1)] = 2 + 1
+    k[k > (n - 1)] = 2 + (n - 1) - 1
+
+    return deBorr_vec(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
+
 from bspline.spline_utils import torch_cr_spl_predict as torch_cr_spl_predict
 def cubic_bspline(x, knots, F, S):
     #knots = torch.linspace(min, max, n_bases)
@@ -100,7 +141,7 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, F, S, monoto
     #                                  p=2)
     #                           for (x, k) in zip(input_a, intervall_correspondance)])
     if calc_method == 'deBoor':
-        prediction = deBoor(x=input_a_clone,
+        prediction = run_deBoor(x=input_a_clone,
                             t=knots,
                             c=params_restricted,
                             p=2)

@@ -24,7 +24,7 @@ if __name__ == '__main__':
                            number_variables=3,
                            polynomial_range=polynomial_range,
                            spline="bspline",
-                           calc_method="torch_bspline")
+                           calc_method="deBoor")
 
     train(decorr, y, iterations=200, verbose=False)
     plt.show()
