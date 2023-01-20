@@ -22,7 +22,7 @@ if __name__ == '__main__':
     train(nf_mctm, y, iterations=200, verbose=False)
     plt.show()
 
-    z = nf_mctm.forward(y, return_log_d=False).detach().numpy()
+    z = nf_mctm.forward(y, train=False).detach().numpy()
 
     sns.kdeplot(x=z[:, 0], y=z[:, 1])
     plt.show()

@@ -15,6 +15,10 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
     output = input.clone()
     # loop over all variables
     params_index = 0
+    # pred penality terms
+    second_order_ridge_pen_sum = 0
+    first_order_ridge_pen_sum = 0
+    param_ridge_pen_sum = 0
 
     for var_num in range(number_variables):
         #print(var_num)
@@ -27,15 +31,16 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
             if inverse:
                 #output into spline
                 if spline == "bspline":
-                    lambda_value = bspline_prediction(params[:, params_index],
-                                                      output[:,covar_num],
-                                                      degree,
-                                                      polynomial_range[:,covar_num],
-                                                      monotonically_increasing=False,
-                                                      derivativ=0,
-                                                      calc_method=calc_method,
-                                                      F=F,
-                                                      S=S)
+                        lambda_value = bspline_prediction(params[:, params_index],
+                                                          output[:, covar_num],
+                                                          degree,
+                                                          polynomial_range[:, covar_num],
+                                                          monotonically_increasing=False,
+                                                          derivativ=0,
+                                                          calc_method=calc_method,
+                                                          F=F,
+                                                          S=S)
+
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
                                                         output[:,covar_num],
@@ -43,10 +48,12 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         polynomial_range[:,covar_num],
                                                         monotonically_increasing=False,
                                                         derivativ=0)
+                                                        #return_penalties not implemented yet
             else:
                 #input into spline
                 if spline == "bspline":
-                    lambda_value = bspline_prediction(params[:, params_index],
+                    lambda_value, second_order_ridge_pen_current, \
+                    first_order_ridge_pen_current, param_ridge_pen_current = bspline_prediction(params[:, params_index],
                                                       input[:,covar_num],
                                                       degree,
                                                       polynomial_range[:,covar_num],
@@ -54,14 +61,23 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       derivativ=0,
                                                       calc_method=calc_method,
                                                       F=F,
-                                                      S=S)
+                                                      S=S,
+                                                      return_penalties=True)
+                    second_order_ridge_pen_sum += second_order_ridge_pen_current
+                    first_order_ridge_pen_sum += first_order_ridge_pen_current
+                    param_ridge_pen_sum += param_ridge_pen_current
+
                 elif spline == "bernstein":
-                    lambda_value = bernstein_prediction(params[:, params_index],
+                    lambda_value, second_order_ridge_pen_current, \
+                    first_order_ridge_pen_current, param_ridge_pen_current = bernstein_prediction(params[:, params_index],
                                                         input[:,covar_num],
                                                         degree,
                                                         polynomial_range[:,covar_num],
                                                         monotonically_increasing=False,
                                                         derivativ=0)
+                    second_order_ridge_pen_sum += second_order_ridge_pen_current
+                    first_order_ridge_pen_sum += first_order_ridge_pen_current
+                    param_ridge_pen_sum += param_ridge_pen_current
 
             # update
             # Cloning issue?
@@ -72,7 +88,11 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
             params_index += 1
 
-    return output
+    if inverse:
+        return output
+    else:
+        return output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
+
 
 from bspline.spline_utils import torch_get_FS
 class Decorrelation(nn.Module):
@@ -104,10 +124,11 @@ class Decorrelation(nn.Module):
         else:
             self.params = nn.Parameter(torch.reshape(p,(self.degree+1, int(self.num_lambdas))))
 
-    def forward(self, input, log_d = 0, inverse = False, return_log_d = False):
+    def forward(self, input, log_d = 0, inverse = False, return_log_d = False, return_penalties=True):
 
         if not inverse:
-            output = multivariable_lambda_prediction(input,
+            output, second_order_ridge_pen_sum, \
+            first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_lambda_prediction(input,
                                                      self.degree,
                                                      self.number_variables,
                                                      self.params,
@@ -129,7 +150,9 @@ class Decorrelation(nn.Module):
                                                      F=self.F,
                                                      S=self.S)
 
-        if return_log_d==True:
+        if return_log_d and return_penalties:
+            return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
+        elif return_log_d:
             return output, log_d
         else:
             return output

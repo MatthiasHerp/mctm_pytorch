@@ -40,28 +40,44 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
     n = degree
     #return sum((params[1] + sum(torch.abs(params[1:(v-1)]))) * b(torch.FloatTensor([v]), torch.FloatTensor([n]), input) for v in range(n+1))
 
+    # penalities
+    second_order_ridge_pen = 0
+    first_order_ridge_pen = 0
+    param_ridge_pen = 0
+
     input_a = (input_a - polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
     if derivativ == 0:
         output = sum(params_restricted[v] * b(torch.FloatTensor([v]), torch.FloatTensor([n]), input_a) for v in range(n+1)) #before we had: params_restricted[v-1]
 
-        return output
+        return output, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen
         #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
     elif derivativ == 1:
         output = sum(params_restricted[v] * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), input_a) -
                                     b(torch.FloatTensor([v]), torch.FloatTensor([n-1]), input_a)) for v in range(n+1))
 
-        return output
+        return output, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen
         #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
 def multivariable_bernstein_prediction(input, degree, number_variables, params, polynomial_range, monotonically_increasing, derivativ=0):
     # input dims: 0: observation number, 1: variable
     # cloning tipp from here: https://discuss.pytorch.org/t/encounter-the-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/836/10
     output = input.clone()
+
+    second_order_ridge_pen_sum = 0
+    first_order_ridge_pen_sum = 0
+    param_ridge_pen_sum = 0
+
     for var_num in range(number_variables):
-        output[:,var_num] = bernstein_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ)
-    return output
+        output[:,var_num], second_order_ridge_pen_current, \
+        first_order_ridge_pen_current, param_ridge_pen_current = bernstein_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ)
+
+        second_order_ridge_pen_sum += second_order_ridge_pen_current
+        first_order_ridge_pen_sum += first_order_ridge_pen_current
+        param_ridge_pen_sum += param_ridge_pen_current
+
+    return output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
 
 def compute_starting_values_berstein_polynomials(degree,min,max):
     par_restricted_opt = torch.tensor(np.linspace(min,max,degree+1), dtype=torch.float32)
@@ -85,10 +101,10 @@ class Transformation(nn.Module):
                                                                                 polynomial_range[1,0]))
 
     def forward(self, input, log_d = 0, inverse = False, monotonically_increasing = True, return_log_d = False):
-        # input dims: 0: observation number, 1: variable
+        # input dims: 0: observaton number, 1: variable
         if not inverse:
-            output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing)
-            output_first_derivativ = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing, derivativ=1)
+            output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing)
+            output_first_derivativ, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing, derivativ=1)
             log_d = log_d + torch.log(torch.abs(output_first_derivativ)) # Error this is false we require the derivativ of the bernstein polynomial!332'
         else:
             output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params_inverse, self.polynomial_range_inverse, monotonically_increasing=False)

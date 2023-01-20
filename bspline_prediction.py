@@ -130,7 +130,7 @@ def cubic_bspline(x, knots, F, S):
 
 
 # Bspline Prediction using the deBoor algorithm
-def bspline_prediction(params_a, input_a, degree, polynomial_range, F, S, monotonically_increasing=False, derivativ=0,calc_method="deBoor"):
+def bspline_prediction(params_a, input_a, degree, polynomial_range, F, S, monotonically_increasing=False, derivativ=0,calc_method="deBoor", return_penalties=False):
 
     params_restricted = params_a.clone().contiguous()
     input_a_clone = input_a.clone().contiguous()
@@ -170,7 +170,13 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, F, S, monoto
         bspline_basis_matrix = bspline.predict(input_a)
         prediction = torch.matmul(bspline_basis_matrix, params_restricted)
 
-    return prediction
+    if return_penalties:
+        second_order_ridge_pen = torch.sum(torch.diff(params_restricted,n=2)**2)
+        first_order_ridge_pen = torch.sum(torch.diff(params_restricted,n=1)**2)
+        param_ridge_pen = torch.sum(params_restricted**2)
+        return prediction, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen
+    else:
+        return prediction
 
 #Code to test how fast different implementations are
 #def B(x, k, i, t):

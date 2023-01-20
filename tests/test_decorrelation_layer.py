@@ -36,7 +36,7 @@ if __name__ == '__main__':
     train(decorr, y, iterations=200, verbose=False)
     plt.show()
 
-    z = decorr.forward(y, return_log_d=False).detach().numpy()
+    z = decorr.forward(y, train=False).detach().numpy()
 
     sns.kdeplot(x=z[:, 0], y=z[:, 1])
     plt.show()

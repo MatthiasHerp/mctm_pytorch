@@ -7,14 +7,22 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 
-def objective(y, model, avg = True):
-    z, log_d = model(y, return_log_d = True)
+def objective(y, model, penalty_params, avg = True):
+    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, train=True)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())
     #print(log_d)
+
+    pen_value_ridge = penalty_params[0]
+    pen_first_ridge = penalty_params[1]
+    pen_second_ridge = penalty_params[2]
+
     if avg:
-        loss = 1 / (z.size(0)*z.size(1)) * (- log_likelihood_latent - log_d).sum()
+        loss = 1 / (z.size(0)*z.size(1)) * (- log_likelihood_latent - log_d).sum() + \
+               pen_second_ridge * second_order_ridge_pen_global + \
+               pen_first_ridge * first_order_ridge_pen_global +  \
+               pen_value_ridge * param_ridge_pen_global
     else:
         loss = - log_likelihood_latent.sum() - log_d.sum()
     return loss
@@ -54,12 +62,12 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
+def optimize(y, model, objective, penalty_params, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
     opt = torch.optim.LBFGS(model.parameters(), history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
         opt.zero_grad()
-        neg_log_likelihood = objective(y, model)# use the `objective` function
+        neg_log_likelihood = objective(y, model, penalty_params)# use the `objective` function
         neg_log_likelihood.backward() # backpropagate the loss
         return neg_log_likelihood
 
@@ -67,7 +75,7 @@ def optimize(y, model, objective, iterations = 2000, verbose=False, patience=5, 
 
     neg_log_likelihoods = []
     for _ in tqdm(range(iterations)):
-        neg_log_likelihood = objective(y, model)
+        neg_log_likelihood = objective(y, model, penalty_params)
         opt.step(closure)
         neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
 
@@ -80,9 +88,9 @@ def optimize(y, model, objective, iterations = 2000, verbose=False, patience=5, 
 
     return neg_log_likelihoods
 
-def train(model, train_data, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
+def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), iterations=2000, verbose=True, patience=5, min_delta=1e-7):
 
-    neg_log_likelihoods = optimize(train_data, model, objective, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+    neg_log_likelihoods = optimize(train_data, model, objective, penalty_params = penalty_params, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
     with sns.axes_style('ticks'):
