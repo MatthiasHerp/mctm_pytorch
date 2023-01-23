@@ -1,5 +1,6 @@
 import torch
 
+from bernstein_transformation_layer import *
 from training_helpers import *
 from nf_mctm import *
 
@@ -24,15 +25,19 @@ if __name__ == '__main__':
     sns.kdeplot(x=y[:, 1], y=y[:, 2])
     plt.show()
 
-    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline")
+    polynomial_range = torch.FloatTensor([[-15, -15, -15],
+                                          [15, 15, 15]])
+    trans = Transformation(degree=10,
+                           number_variables=3,
+                           polynomial_range=polynomial_range)
 
-    #nf_mctm.forward(y, inverse=False)
+    init_z = trans.forward(y)
 
-    train(nf_mctm, y, iterations=200, penalty_params=torch.FloatTensor([0,0,0]), verbose=False)
+
+    train(trans, y, iterations=200, verbose=False)
     plt.show()
 
-    output_tuple = nf_mctm.forward(y, inverse=False)
-    z = output_tuple[0].detach().numpy()
+    z = trans.forward(y, train=False).detach().numpy()
 
     sns.kdeplot(x=z[:, 0], y=z[:, 1])
     plt.show()

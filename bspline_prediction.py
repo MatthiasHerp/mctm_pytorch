@@ -67,6 +67,15 @@ def deBoor(x, t, c, p):
 
     return pred
 
+
+
+
+
+
+
+
+
+
 class deBoor():
     def __init__(self,t,c,p,x):
         self.t=t
@@ -117,6 +126,14 @@ def run_deBoor(x, t, c, p):
     k = deBoor_obj.compute_k(x)
 #
     return deBorr_func_vectorized(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
+
+
+
+
+
+
+
+
 
 from bspline.spline_utils import torch_cr_spl_predict as torch_cr_spl_predict
 def cubic_bspline(x, knots, F, S):
