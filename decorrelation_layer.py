@@ -1,15 +1,10 @@
 import torch
 from torch import nn
 import numpy as np
-from torch.distributions import Normal, Laplace
-import matplotlib.pyplot as plt
-from torch import optim
-from tqdm import tqdm
-import seaborn as sns
 from bernstein_transformation_layer import bernstein_prediction
 from bspline_prediction import bspline_prediction
 
-def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, calc_method, F, S, inverse=False):
+def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False):
 
     #steps
     output = input.clone()
@@ -36,10 +31,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                           degree,
                                                           polynomial_range[:, covar_num],
                                                           monotonically_increasing=False,
-                                                          derivativ=0,
-                                                          calc_method=calc_method,
-                                                          F=F,
-                                                          S=S)
+                                                          derivativ=0)
 
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
@@ -59,9 +51,6 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       polynomial_range[:,covar_num],
                                                       monotonically_increasing=False,
                                                       derivativ=0,
-                                                      calc_method=calc_method,
-                                                      F=F,
-                                                      S=S,
                                                       return_penalties=True)
                     second_order_ridge_pen_sum += second_order_ridge_pen_current
                     first_order_ridge_pen_sum += first_order_ridge_pen_current
@@ -94,30 +83,17 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
         return output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
 
 
-from bspline.spline_utils import torch_get_FS
 class Decorrelation(nn.Module):
-    def __init__(self, degree, number_variables, polynomial_range, spline="bspline", calc_method="deBoor"):
+    def __init__(self, degree, number_variables, polynomial_range, spline="bspline"):
         super().__init__()
         self.degree  = degree
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
         self.num_lambdas = number_variables * (number_variables-1) / 2
         self.spline = spline
-        self.calc_method = calc_method
         # https://discuss.pytorch.org/t/how-to-turn-list-of-varying-length-tensor-into-a-tensor/1361
         # param dims: 0: basis, 1: variable
         p = torch.FloatTensor(np.repeat(np.repeat(0.1,self.degree+1), self.num_lambdas))
-
-        self.register_buffer("F", torch.zeros((degree + 1, degree + 1)))
-        self.register_buffer("S", torch.zeros((degree + 1, degree + 1)))
-        if spline == "bspline" and calc_method == "cubic":
-            n = degree + 1
-            distance_between_knots = (polynomial_range[1] - polynomial_range[0]) / (n - 1)
-
-            knots = torch.tensor(np.linspace(polynomial_range[0] - 2 * distance_between_knots,
-                                             polynomial_range[1] + 2 * distance_between_knots,
-                                             n + 4), dtype=torch.float32)
-            self.F, self.S = torch_get_FS(knots)
 
         if self.num_lambdas == 1:
             self.params = nn.Parameter(p.unsqueeze(1))
@@ -134,10 +110,7 @@ class Decorrelation(nn.Module):
                                                      self.params,
                                                      self.polynomial_range,
                                                      inverse=False,
-                                                     spline=self.spline,
-                                                     calc_method=self.calc_method,
-                                                     F=self.F,
-                                                     S=self.S)
+                                                     spline=self.spline)
         else:
             output = multivariable_lambda_prediction(input,
                                                      self.degree,
@@ -145,10 +118,7 @@ class Decorrelation(nn.Module):
                                                      self.params,
                                                      self.polynomial_range,
                                                      inverse=True,
-                                                     spline=self.spline,
-                                                     calc_method=self.calc_method,
-                                                     F=self.F,
-                                                     S=self.S)
+                                                     spline=self.spline)
 
         if return_log_d and return_penalties:
             return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum

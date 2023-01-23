@@ -17,7 +17,7 @@ if __name__ == '__main__':
     y = y.reshape((2000, 3))
     y.size()
 
-    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline", calc_method="deBoor")
+    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline")
 
     train(nf_mctm, y, iterations=200, verbose=False)
     plt.show()

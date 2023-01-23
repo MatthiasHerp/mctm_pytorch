@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import numpy as np
-from torch.distributions import Normal, Laplace
 import matplotlib.pyplot as plt
 from torch import optim
 from tqdm import tqdm
