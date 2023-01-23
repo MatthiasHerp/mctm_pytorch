@@ -124,9 +124,7 @@ class Decorrelation(nn.Module):
         else:
             self.params = nn.Parameter(torch.reshape(p,(self.degree+1, int(self.num_lambdas))))
 
-    def forward(self, input_tuple, inverse, log_d = 0, return_log_d = False, return_penalties=True):
-
-        input, log_d_global, param_ridge_pen_global, first_order_ridge_pen_global, second_order_ridge_pen_global = input_tuple
+    def forward(self, input, log_d = 0, inverse = False, return_log_d = False, return_penalties=True):
 
         if not inverse:
             output, second_order_ridge_pen_sum, \
@@ -151,19 +149,13 @@ class Decorrelation(nn.Module):
                                                      calc_method=self.calc_method,
                                                      F=self.F,
                                                      S=self.S)
-            log_d = None
-            param_ridge_pen_sum = None
-            first_order_ridge_pen_sum = None
-            second_order_ridge_pen_sum = None
 
-        return (output, log_d, param_ridge_pen_sum, first_order_ridge_pen_sum, second_order_ridge_pen_sum)
-
-        #if return_log_d and return_penalties:
-        #    return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
-        #elif return_log_d:
-        #    return output, log_d
-        #else:
-        #    return output
+        if return_log_d and return_penalties:
+            return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
+        elif return_log_d:
+            return output, log_d
+        else:
+            return output
 
     #def __repr__(self):
     #    return "Affine(alpha={alpha:.2f}, beta={beta:.2f})".format(alpha = self.alpha[0], beta = self.beta[0])

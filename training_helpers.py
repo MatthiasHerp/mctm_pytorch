@@ -8,7 +8,7 @@ from tqdm import tqdm
 import seaborn as sns
 
 def objective(y, model, penalty_params, avg = True):
-    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, inverse=False)
+    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, train=True)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())

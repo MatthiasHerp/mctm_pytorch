@@ -17,22 +17,12 @@ if __name__ == '__main__':
     y = y.reshape((2000, 3))
     y.size()
 
-    sns.kdeplot(x=y[:, 0], y=y[:, 1])
-    plt.show()
-    sns.kdeplot(x=y[:, 0], y=y[:, 2])
-    plt.show()
-    sns.kdeplot(x=y[:, 1], y=y[:, 2])
+    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline", calc_method="deBoor")
+
+    train(nf_mctm, y, iterations=200, verbose=False)
     plt.show()
 
-    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline")
-
-    #nf_mctm.forward(y, inverse=False)
-
-    train(nf_mctm, y, iterations=200, penalty_params=torch.FloatTensor([0,0,0]), verbose=False)
-    plt.show()
-
-    output_tuple = nf_mctm.forward(y, inverse=False)
-    z = output_tuple[0].detach().numpy()
+    z = nf_mctm.forward(y, train=False).detach().numpy()
 
     sns.kdeplot(x=z[:, 0], y=z[:, 1])
     plt.show()

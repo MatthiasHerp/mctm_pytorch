@@ -100,30 +100,19 @@ class Transformation(nn.Module):
                                                                                 polynomial_range[0,0],
                                                                                 polynomial_range[1,0]))
 
-    def forward(self, input_tuple, inverse, log_d = 0, monotonically_increasing = True, return_log_d = False):
-
-        input, log_d_global, param_ridge_pen_global, first_order_ridge_pen_global, second_order_ridge_pen_global = input_tuple
-
+    def forward(self, input, log_d = 0, inverse = False, monotonically_increasing = True, return_log_d = False):
         # input dims: 0: observaton number, 1: variable
         if not inverse:
             output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing)
-            # Computing derivative here the outputed penalty terms are a nuisance (not required)
             output_first_derivativ, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing, derivativ=1)
             log_d = log_d + torch.log(torch.abs(output_first_derivativ)) # Error this is false we require the derivativ of the bernstein polynomial!332'
         else:
             output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params_inverse, self.polynomial_range_inverse, monotonically_increasing=False)
-            log_d = 0
-            param_ridge_pen_sum = 0
-            first_order_ridge_pen_sum = 0
-            second_order_ridge_pen_sum = 0
 
-        log_d_global += log_d
-        param_ridge_pen_global += param_ridge_pen_sum
-        first_order_ridge_pen_global += first_order_ridge_pen_sum
-        second_order_ridge_pen_global += second_order_ridge_pen_sum
-
-        return (output, log_d_global, param_ridge_pen_global, first_order_ridge_pen_global, second_order_ridge_pen_global)
-
+        if return_log_d==True:
+            return output, log_d
+        else:
+            return output
 
     def approximate_inverse(self, input, polynomial_range_inverse, iterations=4000):
         # optimization using linespace data and the forward berstein polynomial?
