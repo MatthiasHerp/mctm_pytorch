@@ -5,6 +5,17 @@ from nf_mctm import *
 
 
 if __name__ == '__main__':
+
+    # Reproducibility
+    # Infos from here: https://pytorch.org/docs/stable/notes/randomness.html
+    # Set Seeds for Torch, Numpy and Python
+    torch.manual_seed(1)
+    import numpy as np
+    np.random.seed(1)
+    import random
+    random.seed(1)
+
+
     from torch.distributions.multivariate_normal import MultivariateNormal
 
     loc = torch.zeros(3)
@@ -17,9 +28,24 @@ if __name__ == '__main__':
     y = y.reshape((2000, 3))
     y.size()
 
-    nf_mctm = NF_MCTM(polynomial_range=torch.tensor([[-15], [15]]), number_variables=3, spline_decorrelation="bspline")
+    nf_mctm = NF_MCTM(input_min=y.min(0).values,
+                      input_max=y.max(0).values,
+                      polynomial_range=torch.tensor([[-5], [5]]),
+                      number_variables=3,
+                      spline_decorrelation="bspline")
 
-    train(nf_mctm, y, iterations=200, verbose=False)
+    #normalisation = Normalisation(input_min=y.min(0).values, input_max=y.max(0).values, output_range=torch.tensor([5]))
+    #y_norm = (y - y.min(0).values) / (y.max(0).values - y.min(0).values) - 0.5
+    #y_norm = y_norm * 2 * torch.FloatTensor([4])
+    ##y_norm = y #normalisation(y)
+#
+    #if y_norm.isnan().sum() > 0:
+    #    print("y_norm contains NaNs")
+    #    print(y_norm)
+    #    exit()
+
+
+    train(nf_mctm, y, iterations=1000, verbose=False)
     plt.show()
 
     z = nf_mctm.forward(y, train=False).detach().numpy()

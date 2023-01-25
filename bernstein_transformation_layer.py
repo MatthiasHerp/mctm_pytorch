@@ -95,7 +95,7 @@ class Transformation(nn.Module):
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
         # param dims: 0: basis, 1: variable
-        self.params = nn.Parameter(compute_starting_values_berstein_polynomials(10,
+        self.params = nn.Parameter(compute_starting_values_berstein_polynomials(degree,
                                                                                 polynomial_range[0,0],
                                                                                 polynomial_range[1,0]))
 

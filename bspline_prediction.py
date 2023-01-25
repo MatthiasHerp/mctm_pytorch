@@ -51,19 +51,26 @@ def run_deBoor(x, t, c, p):
 # Bspline Prediction using the deBoor algorithm
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False):
 
+    order=2
     params_restricted = params_a.clone().contiguous()
     input_a_clone = input_a.clone().contiguous()
     n = degree+1
     distance_between_knots = (polynomial_range[1] - polynomial_range[0]) / (n-1)
 
-    knots = torch.tensor(np.linspace(polynomial_range[0]-2*distance_between_knots,
-                                     polynomial_range[1]+2*distance_between_knots,
+    knots = torch.tensor(np.linspace(polynomial_range[0]-order*distance_between_knots,
+                                     polynomial_range[1]+order*distance_between_knots,
                                      n+4), dtype=torch.float32)
 
     prediction = run_deBoor(x=input_a_clone,
                             t=knots,
                             c=params_restricted,
-                            p=2)
+                            p=order)
+
+    if prediction.isnan().sum() > 0:
+       print("prediction contains NaNs")
+       print("prediction is nan:",prediction[prediction.isnan()])
+       print("knots:",knots)
+
 
     if return_penalties:
         second_order_ridge_pen = torch.sum(torch.diff(params_restricted,n=2)**2)

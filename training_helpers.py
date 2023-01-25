@@ -62,8 +62,8 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
-    opt = torch.optim.LBFGS(model.parameters(), history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
+def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
+    opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
         opt.zero_grad()
@@ -88,9 +88,9 @@ def optimize(y, model, objective, penalty_params, iterations = 2000, verbose=Fal
 
     return neg_log_likelihoods
 
-def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), iterations=2000, verbose=True, patience=5, min_delta=1e-7):
+def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
 
-    neg_log_likelihoods = optimize(train_data, model, objective, penalty_params = penalty_params, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+    neg_log_likelihoods = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
     with sns.axes_style('ticks'):
