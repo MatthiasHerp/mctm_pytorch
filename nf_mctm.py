@@ -31,12 +31,12 @@ class NF_MCTM(nn.Module):
         self.l6 = Decorrelation(degree=degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
 
 
-    def forward(self, x, train=True):
+    def forward(self, y, train=True):
         # Normalisation
         if  self.normalisation_layer is not None:
-            output = self.l0.forward(x)
+            output = self.l0.forward(y)
         else:
-            output = x
+            output = y
 
         # Training or evaluation
         if train:
@@ -71,3 +71,13 @@ class NF_MCTM(nn.Module):
             output = self.l6(output, return_log_d=False, return_penalties=False)
 
             return output
+
+    def latent_space_representation(self, y):
+        z = self.forward(y,train=False)
+        return z
+
+    def log_likelihood(self, y):
+        z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y,train=True)
+        log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
+        log_likelihood = log_likelihood_latent + log_d
+        return log_likelihood
