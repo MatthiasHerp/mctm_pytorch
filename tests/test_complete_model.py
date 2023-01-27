@@ -45,10 +45,12 @@ if __name__ == '__main__':
     #    exit()
 
 
-    train(nf_mctm, y, iterations=1000, verbose=False)
+    loss = train(nf_mctm, y, iterations=200, verbose=False)
     plt.show()
 
-    z = nf_mctm.forward(y, train=False).detach().numpy()
+    log_likelihood = nf_mctm.log_likelihood(y=y)
+
+    z = nf_mctm.latent_space_representation(y).detach().numpy()
 
     sns.kdeplot(x=z[:, 0], y=z[:, 1])
     plt.show()

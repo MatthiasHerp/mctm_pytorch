@@ -90,14 +90,16 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
 
 def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
 
-    neg_log_likelihoods = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+    loss = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
     with sns.axes_style('ticks'):
-        plt.plot(neg_log_likelihoods)
+        plt.plot(loss)
         plt.xlabel("Iteration")
         plt.ylabel("Loss")
     sns.despine(trim = True)
+
+    return loss
 
 
 def evaluate(model):
