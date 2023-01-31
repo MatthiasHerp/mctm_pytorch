@@ -62,43 +62,53 @@ def create_uniform_test_grid(num_observations=2000,ci_border=0.99):
 
     return obs_grid, log_likelihood
 
-def test_kl_divergence(model,test_data, test_likelihood):
-    z = model.forward(test_data,train=False)
-    loc = torch.zeros(3)
-    scale = torch.eye(3)
-    y_distribution = MultivariateNormal(loc, scale)
-    pred_log_likelihood = y_distribution.log_prob(z)
-    #False need a fct that gives likelihood of the data given the network, require the log determinants
-
-    kl_loss = nn.KLDivLoss(reduction="batchmean", log_target=True)
-    #both input and target need to be in log likelihood
-    return kl_loss(pred_log_likelihood, test_likelihood)
+def kl_divergence(target_log_likelihood, predicted_log_likelihood):
+    return torch.mean(torch.exp(target_log_likelihood) * (target_log_likelihood - predicted_log_likelihood))
 
 def evaluate_latent_space(z):
     # https://www.statology.org/multivariate-normality-test-r/
     # https://github.com/raphaelvallat/pingouin/blob/master/pingouin/multivariate.py
     # https://www.math.kit.edu/stoch/~henze/seite/aiwz/media/tests-mvn-test-2020.pdf
+
+    # Need to transpose as the test requires: rows=observations, columns=variables
     res = multivariate_normality(z, alpha=.05)
+    res_normal = res.normal
+    res_normality = res.pval
     k2, p  = stats.normaltest(z)
 
-    return res.normal, res.pval, np.mean(z,0), np.cov(z,rowvar=False), p
+    return res_normal, res_normality, np.mean(z,0), np.cov(z,rowvar=False), p
 
 
 from itertools import combinations
 
 def density_plots(data):
     num_cols = data.shape[1]
-    fig, axs = plt.subplots(nrows=1, ncols=num_cols, figsize=(15,5),
-                            gridspec_kw={'wspace':0.0, 'hspace':0.0},sharey=True)
-    a=0
-    for i, j in combinations(range(num_cols), 2):
-        if i != j:
-            sns.kdeplot(ax=axs[a], x=data[:, j], y=data[:, i])
-            a+=1
-    plt.subplots_adjust(wspace=0.05)
+    num_combinations = int(num_cols * (num_cols - 1) / 2)
+
+    if num_combinations > 1 :
+        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15,5),
+                                gridspec_kw={'wspace':0.0, 'hspace':0.0},sharey=True)
+        a=0
+        for i, j in combinations(range(num_cols), 2):
+            if i != j:
+                sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[a])
+                sns.kdeplot(x=data[:,j], y=data[:,i], fill=True, alpha=0.9, ax=axs[a])
+                a+=1
+        plt.subplots_adjust(wspace=0.05)
+    else:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.scatterplot(x=data[:,0], y=data[:,1], alpha=0.6, color="k", ax = ax)
+        sns.kdeplot(x=data[:,0], y=data[:,1], fill=True, alpha=0.9, ax = ax)
+
 
     return fig
 
 def plot_latent_space(z):
     fig = density_plots(z)
+    return fig
+
+def plot_transformation_layer_splines(model,layer_number,data):
+    return fig
+
+def plot_decorrelation_layer_splines(model,layer_number,data):
     return fig

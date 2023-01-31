@@ -77,7 +77,7 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
     for _ in tqdm(range(iterations)):
         neg_log_likelihood = objective(y, model, penalty_params)
         opt.step(closure)
-        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy())
+        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy().item())
 
         if verbose:
             print(neg_log_likelihood.item())
@@ -93,13 +93,12 @@ def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning
     loss = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
     # Plot neg_log_likelihoods over training iterations:
-    with sns.axes_style('ticks'):
-        plt.plot(loss)
-        plt.xlabel("Iteration")
-        plt.ylabel("Loss")
-    sns.despine(trim = True)
+    fig, ax = plt.subplots(figsize=(6, 6))
+    sns.lineplot(data=loss, ax=ax)
+    plt.xlabel("Iteration")
+    plt.ylabel("Loss")
 
-    return loss
+    return loss, fig
 
 
 def evaluate(model):
