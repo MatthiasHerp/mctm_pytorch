@@ -44,7 +44,8 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
     first_order_ridge_pen = 0
     param_ridge_pen = 0
 
-    input_a = (input_a - polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
+    normalizing_range = polynomial_range[1] - polynomial_range[0]
+    input_a = (input_a - polynomial_range[0]) / (normalizing_range)
 
     if derivativ == 0:
         output = sum(params_restricted[v] * b(torch.FloatTensor([v]), torch.FloatTensor([n]), input_a) for v in range(n+1)) #before we had: params_restricted[v-1]
@@ -53,8 +54,12 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
         #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
 
     elif derivativ == 1:
-        output = sum(params_restricted[v] * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), input_a) -
-                                    b(torch.FloatTensor([v]), torch.FloatTensor([n-1]), input_a)) for v in range(n+1))
+        #output = sum(params_restricted[v] * b(torch.FloatTensor([v - 1]), torch.FloatTensor([n]), input_a) * (
+        #            torch.FloatTensor([v]) - torch.FloatTensor([n]) * input_a) for v in range(n + 1))
+        # My derivativ see goodnotes
+        output = 1/normalizing_range * sum(params_restricted[v] * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), input_a) -
+                                                                                            b(torch.FloatTensor([v]), torch.FloatTensor([n-1]), input_a)) for v in range(n+1))
+        # The Bernstein polynomial basis: A centennial retrospective p.391 (17)
 
         return output, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen
         #return (output + polynomial_range[0]) / (polynomial_range[1] - polynomial_range[0])
@@ -104,7 +109,8 @@ class Transformation(nn.Module):
         if not inverse:
             output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing)
             output_first_derivativ, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params, self.polynomial_range, monotonically_increasing, derivativ=1)
-            log_d = log_d + torch.log(torch.abs(output_first_derivativ)) # Error this is false we require the derivativ of the bernstein polynomial!332'
+            log_d = log_d + torch.log(output_first_derivativ) # Error this is false we require the derivativ of the bernstein polynomial!332'
+            # took out torch.abs(), misunderstanding, determinant can be a negativ value (flipping of the coordinate system)
         else:
             output = multivariable_bernstein_prediction(input, self.degree, self.number_variables, self.params_inverse, self.polynomial_range_inverse, monotonically_increasing=False)
 

@@ -79,5 +79,6 @@ class NF_MCTM(nn.Module):
     def log_likelihood(self, y):
         z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y,train=True)
         log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
-        log_likelihood = log_likelihood_latent + log_d
-        return log_likelihood
+        log_likelihood = log_likelihood_latent + log_d #now a minus here
+        vec_log_likelihood = log_likelihood.sum(1)
+        return vec_log_likelihood
