@@ -1,3 +1,5 @@
+import time
+
 import torch
 from torch import nn
 import numpy as np
@@ -14,21 +16,30 @@ def objective(y, model, penalty_params, avg = True):
     #print(log_d.size())
     #print(log_d)
 
-    pen_value_ridge = penalty_params[0]
-    pen_first_ridge = penalty_params[1]
-    pen_second_ridge = penalty_params[2]
+    pen_value_ridge = penalty_params[0] * param_ridge_pen_global
+    pen_first_ridge = penalty_params[1] * first_order_ridge_pen_global
+    pen_second_ridge = penalty_params[2] * second_order_ridge_pen_global
+
+    neg_likelihood = (- log_likelihood_latent - log_d).sum()
 
     if avg:
-        loss = 1 / (z.size(0)*z.size(1)) * (- log_likelihood_latent - log_d).sum() + \
-               pen_second_ridge * second_order_ridge_pen_global + \
-               pen_first_ridge * first_order_ridge_pen_global +  \
-               pen_value_ridge * param_ridge_pen_global
-    else:
-        loss = - log_likelihood_latent.sum() - log_d.sum()
-    return loss
+        # We average the loss and the penalties
+        # By averaging the penalties we make the penalisation magnitude independent of the number of knots
+        pen_value_ridge = 1 / (3*model.degree_decorrelation) * pen_value_ridge
+        pen_first_ridge = 1 / (3*model.degree_decorrelation) * pen_first_ridge
+        pen_second_ridge = 1 / (3*model.degree_decorrelation) * pen_second_ridge
+
+        neg_likelihood = 1 / (z.size(0)*z.size(1)) * neg_likelihood
+
+    loss = neg_likelihood + \
+           pen_value_ridge + \
+           pen_first_ridge +  \
+           pen_second_ridge
+
+    return loss, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
 class EarlyStopper:
-    def __init__(self, patience=1, min_delta=0):
+    def __init__(self, patience=1, min_delta=0.):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
@@ -67,40 +78,49 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
 
     def closure():
         opt.zero_grad()
-        neg_log_likelihood = objective(y, model, penalty_params)# use the `objective` function
-        neg_log_likelihood.backward() # backpropagate the loss
-        return neg_log_likelihood
+        loss, pen_value_ridge, \
+        pen_first_ridge, pen_second_ridge  = objective(y, model, penalty_params) # use the `objective` function
+        loss.backward() # backpropagate the loss
+        return loss
 
     early_stopper = EarlyStopper(patience=patience, min_delta=min_delta)
 
-    neg_log_likelihoods = []
-    for _ in tqdm(range(iterations)):
-        neg_log_likelihood = objective(y, model, penalty_params)
+    loss_list = []
+    for i in tqdm(range(iterations)):
+        number_iterations = i
+
+        current_loss, pen_value_ridge, \
+        pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)
         opt.step(closure)
-        neg_log_likelihoods.append(neg_log_likelihood.detach().numpy().item())
+        loss_list.append(current_loss.detach().numpy().item())
 
         if verbose:
-            print(neg_log_likelihood.item())
+            print("Loss:",current_loss.item())
 
-        if early_stopper.early_stop(neg_log_likelihood.detach().numpy()):
-            print("Early Stop!")
+        if early_stopper.early_stop(current_loss.detach().numpy()):
+            print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience, "and min_delta", min_delta)
             break
 
-    return neg_log_likelihoods
+    return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
 def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
 
-    loss = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+    start = time.time()
+    loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+    end = time.time()
+
+    training_time = end - start
 
     # Plot neg_log_likelihoods over training iterations:
     fig, ax = plt.subplots(figsize=(6, 6))
-    sns.lineplot(data=loss, ax=ax)
+    sns.lineplot(data=loss_list, ax=ax)
     plt.xlabel("Iteration")
     plt.ylabel("Loss")
 
-    return loss, fig
+    return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, training_time, fig
 
 
+# Outdated function when we merely tested with Laplace example from probML lecture
 def evaluate(model):
     p_source = Normal(0, 1)
     p_target = Laplace(5, 3)
