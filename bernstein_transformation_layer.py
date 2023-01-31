@@ -83,12 +83,12 @@ def multivariable_bernstein_prediction(input, degree, number_variables, params, 
 
     return output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
 
-def compute_starting_values_berstein_polynomials(degree,min,max):
+def compute_starting_values_berstein_polynomials(degree,min,max,number_variables):
     par_restricted_opt = torch.tensor(np.linspace(min,max,degree+1), dtype=torch.float32)
     par_unristricted = par_restricted_opt
     par_unristricted[1:] = torch.log(par_restricted_opt[1:] - par_restricted_opt[:-1])#torch.diff(par_restricted_opt[1:]))
 
-    par_restricted_opt = torch.Tensor.repeat(par_unristricted,(3,1)).T
+    par_restricted_opt = torch.Tensor.repeat(par_unristricted,(number_variables,1)).T
     #par_restricted_opt = torch.reshape(par_restricted_opt,(degree+1,3))
 
     return par_restricted_opt
@@ -96,13 +96,15 @@ def compute_starting_values_berstein_polynomials(degree,min,max):
 class Transformation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range):
         super().__init__()
+        self.type = "transformation"
         self.degree  = degree
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
         # param dims: 0: basis, 1: variable
         self.params = nn.Parameter(compute_starting_values_berstein_polynomials(degree,
                                                                                 polynomial_range[0,0],
-                                                                                polynomial_range[1,0]))
+                                                                                polynomial_range[1,0],
+                                                                                self.number_variables))
 
     def forward(self, input, log_d = 0, inverse = False, monotonically_increasing = True, return_log_d = False):
         # input dims: 0: observaton number, 1: variable

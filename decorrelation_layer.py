@@ -86,6 +86,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 class Decorrelation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range, spline="bspline"):
         super().__init__()
+        self.type = "decorrelation"
         self.degree  = degree
         self.number_variables = number_variables
         self.polynomial_range = polynomial_range
