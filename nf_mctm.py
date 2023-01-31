@@ -18,17 +18,20 @@ class NF_MCTM(nn.Module):
         self.input_max = input_max
         self.normalisation_layer = normalisation_layer
 
+        self.degree_transformations = degree_transformations
+        self.degree_decorrelation = degree_decorrelation
+
         if self.normalisation_layer == "bounding":
             self.l0 = Normalisation(input_min=self.input_min, input_max=self.input_max, output_range=polynomial_range[1]-polynomial_range[1]*0.25)
         #if self.normalisation_layer == "standardisation":
         #    self.l0 = Normalisation(input_mean=self.input_min, input_variance=self.input_max, output_range=polynomial_range[1])
 
-        self.l1 = Transformation(degree=degree_transformations, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3))
-        self.l2 = Decorrelation(degree=degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l1 = Transformation(degree=self.degree_transformations, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3))
+        self.l2 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
         self.l3 = Flip()
-        self.l4 = Decorrelation(degree=degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l4 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
         self.l5 = Flip()
-        self.l6 = Decorrelation(degree=degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l6 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
 
 
     def forward(self, y, train=True):
@@ -82,3 +85,17 @@ class NF_MCTM(nn.Module):
         log_likelihood = log_likelihood_latent + log_d #now a minus here
         vec_log_likelihood = log_likelihood.sum(1)
         return vec_log_likelihood
+
+    def sample(self, n_samples):
+        z = torch.distributions.Normal(0, 1).sample((n_samples, self.number_variables))
+
+        output = self.l6(z, return_log_d=False, return_penalties=False)
+        output = self.l5(output)
+        output = self.l4(output, return_log_d=False, return_penalties=False)
+        output = self.l3(output)
+        output = self.l2(output, return_log_d=False, return_penalties=False)
+        y = self.l1(output)
+
+        return y
+
+
