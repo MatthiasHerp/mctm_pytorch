@@ -103,24 +103,28 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
 
     return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
-def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7):
+def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
 
-    start = time.time()
-    loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
-    end = time.time()
+    if return_report:
+        start = time.time()
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+        end = time.time()
 
-    training_time = end - start
+        training_time = end - start
 
-    # Plot neg_log_likelihoods over training iterations:
-    fig, ax = plt.subplots(figsize=(6, 6))
-    sns.lineplot(data=loss_list, ax=ax)
-    plt.xlabel("Iteration")
-    plt.ylabel("Loss")
+        # Plot neg_log_likelihoods over training iterations:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.lineplot(data=loss_list, ax=ax)
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
 
-    return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, training_time, fig
+        return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, training_time, fig
+
+    else:
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
 
-# Outdated function when we merely tested with Laplace example from probML lecture
+#TODO: Outdated function when we merely tested with Laplace example from probML lecture
 def evaluate(model):
     p_source = Normal(0, 1)
     p_target = Laplace(5, 3)

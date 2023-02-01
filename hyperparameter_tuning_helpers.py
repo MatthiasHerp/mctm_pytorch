@@ -78,15 +78,15 @@ def hyperparameter_tuning(y: torch.Tensor,
                               degree_decorrelation=degree_decorrelation,
                               normalisation_layer=normalisation_layer)
 
-            loss_training_iterations, number_iterations, pen_value_ridge_final, pen_first_ridge_final, pen_second_ridge_final, \
-            training_time, fig_training = train(model=nf_mctm,
-                                                train_data=y_train,
-                                                penalty_params=penalty_params,
-                                                iterations=iterations,
-                                                learning_rate=learning_rate,
-                                                patience=patience,
-                                                min_delta=min_delta,
-                                                verbose=False)
+            train(model=nf_mctm,
+                  train_data=y_train,
+                  penalty_params=penalty_params,
+                  iterations=iterations,
+                  learning_rate=learning_rate,
+                  patience=patience,
+                  min_delta=min_delta,
+                  verbose=False,
+                  return_report=False) #no need for reporting and metrics,plots etc...
 
             sum_validation_log_likelihood = nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
 
@@ -113,11 +113,19 @@ def extract_optimal_hyperparameters(results: pd.DataFrame):
     results_mean = results.groupby(['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
                                     'patience', 'min_delta', 'degree_transformations',
                                     'degree_decorrelation']).mean()
+    results_std = results.groupby(['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
+                                    'patience', 'min_delta', 'degree_transformations',
+                                    'degree_decorrelation']).std()
     #TODO: cannot grooubby if we have nan values in a column, e.g. dropped normalisation_layer, if I decide to keep this layer then fix this
     results_mean = results_mean.reset_index()
+    results_std = results_std.reset_index()
 
     optimal_hyperparameters = results_mean.loc[results_mean['sum_validation_log_likelihood'].idxmax()]
     optimal_hyperparameters = optimal_hyperparameters.drop(['fold','sum_validation_log_likelihood'])
 
-    return optimal_hyperparameters.values
+    results_mean["std_validation_log_likelihood"] = results_std["sum_validation_log_likelihood"]
+    results_mean.rename(columns={'sum_validation_log_likelihood': 'mean_validation_log_likelihood)'}, inplace=True)
+    results_moments = results_mean.drop(['fold'],axis=1)
+
+    return optimal_hyperparameters.values, results_moments
 

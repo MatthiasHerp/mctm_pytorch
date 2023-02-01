@@ -57,11 +57,12 @@ def run_simulation_study(
                                     learning_rate_list, patience_list, min_delta_list,
                                     degree_transformations_list, degree_decorrelation_list, normalisation_layer_list)
 
-    penvalueridge, penfirstridge, pensecondridge, learning_rate,\
-    patience, min_delta, degree_transformations,\
-    degree_decorrelation, normalisation_layer = extract_optimal_hyperparameters(results)
+    optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
+    penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+    patience, min_delta, degree_transformations, \
+    degree_decorrelation, normalisation_layer  = optimal_hyperparameters
 
-    # Logging the hyperparameters
+        # Logging the hyperparameters
     # mlflow.log_param(key="copula", value=copula)
     # mlflow.log_param(key="seed", value=seed_value)
     mlflow.log_param(key="pen_value_ridge", value=penvalueridge)
@@ -135,6 +136,18 @@ def run_simulation_study(
     kl_divergence_true_model_train = torch.mean(kl_divergence_true_model_train_vec).item()
     fig_kl_divergence_true_model_train = plot_kl_divergence_scatter(y_train, kl_divergence_true_model_train_vec)
 
+    # estimate the Multivariate Normal Distribution as Model
+    mean_mvn_model = y_train.mean(0)
+    cov_mvn_model = y_train.T.cov()
+    mvn_model = MultivariateNormal(loc=mean_mvn_model, covariance_matrix=cov_mvn_model)
+
+    train_log_likelihood_mvn_model = mvn_model.log_prob(y_train)
+    kl_divergence_mvn_model_train_vec = kl_divergence(target_log_likelihood=train_log_likelihood,
+                                                  predicted_log_likelihood=train_log_likelihood_mvn_model,
+                                                  mean=False)
+    kl_divergence_mvn_model_train = torch.mean(kl_divergence_mvn_model_train_vec).item()
+    fig_kl_divergence_mvn_model_train = plot_kl_divergence_scatter(y_train, kl_divergence_mvn_model_train_vec)
+
     #### Test Evaluation
     # Evaluate latent space of the model in test set
     z_test = nf_mctm.forward(y_test, train=False).detach().numpy()
@@ -148,13 +161,21 @@ def run_simulation_study(
     kl_divergence_nf_mctm_test = torch.mean(kl_divergence_nf_mctm_test_vec).item()
     fig_kl_divergence_nf_mctm_test = plot_kl_divergence_scatter(y_test, kl_divergence_nf_mctm_test_vec)
 
-    # estimate true model on test data
+    # estimated true model on test data
     test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     kl_divergence_true_model_test_vec = kl_divergence(target_log_likelihood=test_log_likelihood,
                                                    predicted_log_likelihood=test_log_likelihood_estimated_true_model,
                                                    mean=False)
     kl_divergence_true_model_test = torch.mean(kl_divergence_true_model_test_vec).item()
     fig_kl_divergence_true_model_test = plot_kl_divergence_scatter(y_test, kl_divergence_true_model_test_vec)
+
+    # mvn Model on test data
+    test_log_likelihood_mvn_model = mvn_model.log_prob(y_test)
+    kl_divergence_mvn_model_test_vec = kl_divergence(target_log_likelihood=test_log_likelihood,
+                                                  predicted_log_likelihood=test_log_likelihood_mvn_model,
+                                                  mean=False)
+    kl_divergence_mvn_model_test = torch.mean(kl_divergence_mvn_model_test_vec).item()
+    fig_kl_divergence_mvn_model_test = plot_kl_divergence_scatter(y_test, kl_divergence_mvn_model_test_vec)
 
     #### Generate a sample from the trained model
     y_sampled = nf_mctm.sample(n_samples=n_samples)
@@ -189,6 +210,9 @@ def run_simulation_study(
     results.to_csv("hyperparameter_tuning_results.csv")
     mlflow.log_artifact("./hyperparameter_tuning_results.csv")
 
+    results_summary.to_csv("hyperparameter_tuning_results_summary.csv")
+    mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
+
     #### Log Train Data Metrics and Artifacts
     fig_y_train.savefig('plot_data_train.png')
     mlflow.log_artifact("./plot_data_train.png")
@@ -210,12 +234,16 @@ def run_simulation_study(
 
     mlflow.log_metric("kl_divergence_nf_mctm_train", kl_divergence_nf_mctm_train)
     mlflow.log_metric("kl_divergence_true_model_train", kl_divergence_true_model_train)
+    mlflow.log_metric("kl_divergence_mvn_model_train", kl_divergence_mvn_model_train)
 
     fig_kl_divergence_nf_mctm_train.savefig('plot_kl_divergence_nf_mctm_train.png')
     mlflow.log_artifact("./plot_kl_divergence_nf_mctm_train.png")
 
     fig_kl_divergence_true_model_train.savefig('plot_kl_divergence_true_model_train.png')
     mlflow.log_artifact("./plot_kl_divergence_true_model_train.png")
+
+    fig_kl_divergence_mvn_model_train.savefig('plot_kl_divergence_mvn_model_train.png')
+    mlflow.log_artifact("./plot_kl_divergence_mvn_model_train.png")
 
     #### Log Test Data Metrics and Artifacts
     fig_y_test.savefig('plot_data_test.png')
@@ -238,12 +266,16 @@ def run_simulation_study(
 
     mlflow.log_metric("kl_divergence_nf_mctm_test", kl_divergence_nf_mctm_test)
     mlflow.log_metric("kl_divergence_true_model_test", kl_divergence_true_model_test)
+    mlflow.log_metric("kl_divergence_mvn_model_test", kl_divergence_mvn_model_test)
 
     fig_kl_divergence_nf_mctm_test.savefig('plot_kl_divergence_nf_mctm_test.png')
     mlflow.log_artifact("./plot_kl_divergence_nf_mctm_test.png")
 
     fig_kl_divergence_true_model_test.savefig('plot_kl_divergence_true_model_test.png')
     mlflow.log_artifact("./plot_kl_divergence_true_model_test.png")
+
+    fig_kl_divergence_mvn_model_test.savefig('plot_kl_divergence_mvn_model_test.png')
+    mlflow.log_artifact("./plot_kl_divergence_mvn_model_test.png")
 
     #### Log Sampling Aritfacts
     np.save("synthetically_sampled_data.npy", y_sampled)
