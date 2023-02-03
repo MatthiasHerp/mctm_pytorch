@@ -1,9 +1,10 @@
 import torch
 import numpy as np
 import functorch
+from reluler_layer import ReLULeR
 
 class deBoor():
-    def __init__(self,t,c,p,x):
+    def __init__(self,t,c,p):
         self.t=t
         self.c=c
         self.p=p
@@ -42,11 +43,20 @@ class deBoor():
 # Runs DeBoor Algorithm vectorized using functorch
 # (much faster (30 sec vs 8:30min) alternative to using a for loop or list comprehension)
 def run_deBoor(x, t, c, p):
-    deBoor_obj = deBoor(t=t, c=c, p=p, x=x)
+    deBoor_obj = deBoor(t=t, c=c, p=p)
     deBorr_func_vectorized = functorch.vmap(deBoor_obj.compute_prediction)
     k = deBoor_obj.compute_k(x)
 
     return deBorr_func_vectorized(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
+
+def custom_sigmoid(input: torch.Tensor, min: float, max: float):
+    input_01 = (input - min) / (max - min)
+    input_11 = input_01 * 2 - 1
+    input_bounded_01 = 1 / (1 + torch.exp(-input_11 * 4 ))
+    input_bounded = input_bounded_01 * (max - min) + min
+
+    return input_bounded
+
 
 # Bspline Prediction using the deBoor algorithm
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False):
@@ -61,6 +71,10 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
                                      polynomial_range[1]+order*distance_between_knots,
                                      n+4), dtype=torch.float32)
 
+    #ReLULeR_obj = ReLULeR(polynomial_range_abs=polynomial_range[1])
+    #input_a_clone = ReLULeR_obj.forward(input_a_clone)
+    #input_a_clone = (torch.sigmoid(input_a_clone/((polynomial_range[1] - polynomial_range[0])) * 10) - 0.5) * (polynomial_range[1] - polynomial_range[0])/2
+    #input_a_clone = custom_sigmoid(input=input_a_clone, min=polynomial_range[0], max=polynomial_range[1])
     prediction = run_deBoor(x=input_a_clone,
                             t=knots,
                             c=params_restricted,
