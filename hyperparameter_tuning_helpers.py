@@ -7,7 +7,7 @@ from nf_mctm import *
 from training_helpers import *
 
 
-def hyperparameter_tuning(y: torch.Tensor,
+def run_hyperparameter_tuning(y: torch.Tensor,
                           poly_span_abs: float,
                           iterations: int,
                           spline_decorrelation: str,
@@ -18,8 +18,8 @@ def hyperparameter_tuning(y: torch.Tensor,
                           patience_list: list,
                           min_delta_list: list,
                           degree_transformations_list: list,
-                          degree_decorrelation_list: list,
-                          normalisation_layer_list: list):
+                          degree_decorrelation_list: list):
+                          #normalisation_layer_list: list):
     """
     Generates List of all combinations of hyperparameter values from lists
     For each combination does a 5-fold cross validation and trains the model
@@ -36,28 +36,26 @@ def hyperparameter_tuning(y: torch.Tensor,
     :param min_delta_list:
     :param degree_transformations_list:
     :param degree_decorrelation_list:
-    :param normalisation_layer_list:
     :return:
     """
 
     list_of_lists = [penvalueridge_list, penfirstridge_list, pensecondridge_list,
                      learning_rate_list,
                      patience_list, min_delta_list,
-                     degree_transformations_list, degree_decorrelation_list,
-                     normalisation_layer_list]
+                     degree_transformations_list, degree_decorrelation_list]
+                     #normalisation_layer_list]
     hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
 
     splits = KFold(n_splits=5)
 
     results = pd.DataFrame(columns=['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
                                     'patience', 'min_delta', 'degree_transformations',
-                                    'degree_decorrelation', 'normalisation_layer',
+                                    'degree_decorrelation', #'normalisation_layer',
                                     'fold','sum_validation_log_likelihood'])
 
     for hyperparamters in hyperparameter_combinations_list:
         penvalueridge, penfirstridge, pensecondridge, learning_rate, \
-        patience, min_delta, degree_transformations, degree_decorrelation, \
-        normalisation_layer = hyperparamters
+        patience, min_delta, degree_transformations, degree_decorrelation  = hyperparamters #normalisation_layer
 
         # Defining the model
         poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
@@ -75,8 +73,8 @@ def hyperparameter_tuning(y: torch.Tensor,
                               number_variables=y_train.size()[1],
                               spline_decorrelation=spline_decorrelation,
                               degree_transformations=degree_transformations,
-                              degree_decorrelation=degree_decorrelation,
-                              normalisation_layer=normalisation_layer)
+                              degree_decorrelation=degree_decorrelation)
+                              #normalisation_layer=normalisation_layer)
 
             train(model=nf_mctm,
                   train_data=y_train,
@@ -95,7 +93,7 @@ def hyperparameter_tuning(y: torch.Tensor,
                                       'patience': patience, 'min_delta': min_delta,
                                       'degree_transformations': degree_transformations,
                                       'degree_decorrelation': degree_decorrelation,
-                                      'normalisation_layer': normalisation_layer,
+                                      #'normalisation_layer': normalisation_layer,
                                       'fold': fold,
                                       'sum_validation_log_likelihood': sum_validation_log_likelihood},
                                      ignore_index=True)

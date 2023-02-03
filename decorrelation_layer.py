@@ -94,14 +94,18 @@ class Decorrelation(nn.Module):
         self.spline = spline
         # https://discuss.pytorch.org/t/how-to-turn-list-of-varying-length-tensor-into-a-tensor/1361
         # param dims: 0: basis, 1: variable
-        p = torch.FloatTensor(np.repeat(np.repeat(0.1,self.degree+1), self.num_lambdas))
+        p = torch.FloatTensor(np.repeat(np.repeat(0.1,self.degree+1), self.num_lambdas)) #(torch.rand(int(self.degree+1), int(self.num_lambdas))-0.5)
 
         if self.num_lambdas == 1:
             self.params = nn.Parameter(p.unsqueeze(1))
         else:
             self.params = nn.Parameter(torch.reshape(p,(self.degree+1, int(self.num_lambdas))))
+        #self.params = p
 
     def forward(self, input, log_d = 0, inverse = False, return_log_d = False, return_penalties=True):
+
+        #if torch.any(torch.abs(input) >= torch.abs(self.polynomial_range)[0]):
+        #    print("Warning: input outside of polynomial range")
 
         if not inverse:
             output, second_order_ridge_pen_sum, \

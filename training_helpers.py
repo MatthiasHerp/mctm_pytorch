@@ -39,11 +39,12 @@ def objective(y, model, penalty_params, avg = True):
     return loss, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
 class EarlyStopper:
-    def __init__(self, patience=1, min_delta=0.):
+    def __init__(self, patience=1, min_delta=0., global_min_loss=-np.inf):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
         self.min_loss = np.inf
+        self.global_min_loss = global_min_loss
 
     def early_stop(self, current_loss):
         if current_loss < self.min_loss:
@@ -55,6 +56,10 @@ class EarlyStopper:
 
             if self.counter >= self.patience:
                 return True
+
+        if current_loss < self.global_min_loss:
+            return True
+
         return False
 
 #def optimize(y, model, objective, iterations = 2000, verbose=True):

@@ -151,12 +151,14 @@ def plot_splines(layer):
     data_span_vec = data_span.reshape((100,1)).repeat(1,num_splines)
 
     if layer.type == "transformation":
-        output, log_d = layer.forward(data_span_vec, return_log_d=True)
-        output_derivativ = torch.exp(log_d).detach().numpy()
+        z_tilde, log_d = layer.forward(data_span_vec, return_log_d=True, monotonically_increasing=True)
+        z_tilde_derivativ = torch.exp(log_d).detach().numpy()
+        data_span_vec_estimated = layer.forward(z_tilde, inverse=True, monotonically_increasing=True)
+        data_span_vec_estimated = data_span_vec_estimated.detach().numpy()
     elif layer.type == "decorrelation":
-        output = data_span_vec.clone()
+        z_tilde = data_span_vec.clone()
         for spline_num in range(num_splines):
-            output[:,spline_num] = bspline_prediction(layer.params[:, spline_num],
+            z_tilde[:,spline_num] = bspline_prediction(layer.params[:, spline_num],
                                data_span_vec[:, spline_num],
                                degree=layer.degree,
                                polynomial_range=layer.polynomial_range[:, 0], #assume same polly range across variables
@@ -164,26 +166,27 @@ def plot_splines(layer):
                                derivativ=0)
 
     data_span_vec = data_span_vec.detach().numpy()
-    output = output.detach().numpy()
+    z_tilde = z_tilde.detach().numpy()
 
     if num_splines > 1 :
         fig, axs = plt.subplots(nrows=1, ncols=num_splines, figsize=(15,5),
                                 gridspec_kw={'wspace':0.0, 'hspace':0.0},sharey=True)
         a=0
         for spline_num in range(num_splines):
-            sns.lineplot(x=data_span_vec[:,spline_num], y=output[:,spline_num], ax = axs[a])
+            sns.lineplot(x=data_span_vec[:,spline_num], y=z_tilde[:,spline_num], ax = axs[a])
             if layer.type == "transformation":
-                sns.lineplot(x=data_span_vec[:,spline_num], y=output_derivativ[:,spline_num], ax = axs[a])
-            axs[a].set_ylim(output.min(), output.max())
-            axs[a].set_xlim(poly_min, poly_max)
+                sns.lineplot(x=data_span_vec[:,spline_num], y=z_tilde_derivativ[:,spline_num], ax = axs[a])
+                sns.lineplot(x=data_span_vec_estimated[:,spline_num], y=z_tilde[:,spline_num], ax = axs[a])
+            axs[a].set_ylim(z_tilde.min(), z_tilde.max())
+            axs[a].set_xlim(data_span_vec[:,spline_num].min(), data_span_vec[:,spline_num].max())
             a+=1
 
         plt.subplots_adjust(wspace=0.05)
 
     else:
         fig, ax = plt.subplots(figsize=(6, 6))
-        sns.lineplot(x=data_span_vec.reshape(100), y=output.reshape(100), ax = ax)
-        ax.set_ylim(output.min(), output.max())
+        sns.lineplot(x=data_span_vec.reshape(100), y=z_tilde.reshape(100), ax = ax)
+        ax.set_ylim(z_tilde.min(), z_tilde.max())
         ax.set_xlim(poly_min, poly_max)
 
 

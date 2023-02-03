@@ -10,26 +10,28 @@ from hyperparameter_tuning_helpers import *
 
 
 def run_simulation_study(
-        copula,
+        experiment_id: int,
+        copula: str,
+        copula_par: float,
+        train_obs: int,
         # Setting Hyperparameter Values
-        seed_value,
-        penvalueridge_list,
-        penfirstridge_list,
-        pensecondridge_list,
-        poly_span_abs,
-        spline_decorrelation,
-        iterations,
-        learning_rate_list,
-        patience_list,
-        min_delta_list,
-        degree_transformations_list,
-        degree_decorrelation_list,
-        normalisation_layer_list,
-        n_samples):
-
+        seed_value: int,
+        penvalueridge_list: list,
+        penfirstridge_list: list,
+        pensecondridge_list: list,
+        poly_span_abs: float,
+        spline_decorrelation: str,
+        iterations: int,
+        learning_rate_list: list,
+        patience_list: list,
+        min_delta_list: list,
+        degree_transformations_list: list,
+        degree_decorrelation_list: list,
+        #normalisation_layer_list: list,
+        hyperparameter_tuning: bool = True,
+        n_samples: int = 2000):
 
     #experiment_id = mlflow.create_experiment(name="test_max_penalty",artifact_location="/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlflow_storage/test_sim_study/")
-    experiment_id = 2
 
     # test data is the same for an experiment, thus we run it only once
     y_test = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + "grid_test.csv").values,dtype=torch.float32)
@@ -40,7 +42,7 @@ def run_simulation_study(
     mlflow.start_run(
         run_name="{}".format(seed_value),
         experiment_id=experiment_id,
-        tags={"seed": seed_value,"copula": copula}
+        tags={"seed": seed_value,"copula": copula, "copula_par": copula_par, "train_obs": train_obs}
     )
     print("Started Run")
 
@@ -48,19 +50,33 @@ def run_simulation_study(
     set_seeds(seed_value)
 
     # Getting the training data
-    y_train = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/"+str(seed_value)+"_sample_train.csv").values,dtype=torch.float32)
-    train_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/"+str(seed_value)+"_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    experiment_folder = str(copula)+"_"+str(copula_par)+"_"+str(train_obs)+"/"
+    y_train = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_sample_train.csv").values,dtype=torch.float32)
+    train_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
 
-    # Running Cross validation to identify hyperparameters
-    results = hyperparameter_tuning(y_train, poly_span_abs, iterations, spline_decorrelation,
-                                    penvalueridge_list, penfirstridge_list, pensecondridge_list,
-                                    learning_rate_list, patience_list, min_delta_list,
-                                    degree_transformations_list, degree_decorrelation_list, normalisation_layer_list)
+    if hyperparameter_tuning:
 
-    optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
-    penvalueridge, penfirstridge, pensecondridge, learning_rate, \
-    patience, min_delta, degree_transformations, \
-    degree_decorrelation, normalisation_layer  = optimal_hyperparameters
+        # Running Cross validation to identify hyperparameters
+        results = run_hyperparameter_tuning(y_train, poly_span_abs, iterations, spline_decorrelation,
+                                        penvalueridge_list, penfirstridge_list, pensecondridge_list,
+                                        learning_rate_list, patience_list, min_delta_list,
+                                        degree_transformations_list, degree_decorrelation_list) #normalisation_layer_list
+
+        optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
+        penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+        patience, min_delta, degree_transformations, \
+        degree_decorrelation  = optimal_hyperparameters #normalisation_layer
+    else:
+        # Setting Hyperparameter Values
+        penvalueridge = penvalueridge_list[0]
+        penfirstridge = penfirstridge_list[0]
+        pensecondridge = pensecondridge_list[0]
+        learning_rate = learning_rate_list[0]
+        patience = patience_list[0]
+        min_delta = min_delta_list[0]
+        degree_transformations = degree_transformations_list[0]
+        degree_decorrelation = degree_decorrelation_list[0]
+        #normalisation_layer = normalisation_layer_list[0]
 
         # Logging the hyperparameters
     # mlflow.log_param(key="copula", value=copula)
@@ -76,7 +92,7 @@ def run_simulation_study(
     mlflow.log_param(key="min_delta", value=min_delta)
     mlflow.log_param(key="degree_transformations", value=degree_transformations)
     mlflow.log_param(key="degree_decorrelation", value=degree_decorrelation)
-    mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
+    #mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
 
     # Defining the model
     poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
@@ -85,7 +101,7 @@ def run_simulation_study(
                                    pensecondridge])
 
     #comes out of CV aas nan which then doe
-    normalisation_layer = None
+    #normalisation_layer = None
 
     nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
                       input_max=y_train.max(0).values,
@@ -93,8 +109,8 @@ def run_simulation_study(
                       number_variables=y_train.size()[1],
                       spline_decorrelation=spline_decorrelation,
                       degree_transformations=int(degree_transformations),
-                      degree_decorrelation=int(degree_decorrelation),
-                      normalisation_layer=normalisation_layer)
+                      degree_decorrelation=int(degree_decorrelation))
+                      #normalisation_layer=normalisation_layer)
 
     # Training the model
     loss_training_iterations, number_iterations, pen_value_ridge_final, pen_first_ridge_final, pen_second_ridge_final,\
@@ -106,6 +122,9 @@ def run_simulation_study(
                                      patience=patience,
                                      min_delta=min_delta,
                                      verbose=False)
+
+    # Training the inverse of the model
+    nf_mctm.l1.approximate_inverse(input=y_train)
 
     #### Training Evaluation
 
@@ -129,7 +148,7 @@ def run_simulation_study(
     fig_kl_divergence_nf_mctm_train = plot_kl_divergence_scatter(y_train, kl_divergence_nf_mctm_train_vec)
 
     # estimate true model on training data
-    train_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + str(seed_value) + "_est_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    train_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+ experiment_folder + str(seed_value) + "_est_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     kl_divergence_true_model_train_vec = kl_divergence(target_log_likelihood=train_log_likelihood,
                                                    predicted_log_likelihood=train_log_likelihood_estimated_true_model,
                                                    mean=False)
@@ -162,7 +181,7 @@ def run_simulation_study(
     fig_kl_divergence_nf_mctm_test = plot_kl_divergence_scatter(y_test, kl_divergence_nf_mctm_test_vec)
 
     # estimated true model on test data
-    test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+ experiment_folder + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     kl_divergence_true_model_test_vec = kl_divergence(target_log_likelihood=test_log_likelihood,
                                                    predicted_log_likelihood=test_log_likelihood_estimated_true_model,
                                                    mean=False)
@@ -207,11 +226,12 @@ def run_simulation_study(
     fig_splines_decorrelation_layer_6.savefig('plot_splines_decorrelation_layer_6.png')
     mlflow.log_artifact("./plot_splines_decorrelation_layer_6.png")
 
-    results.to_csv("hyperparameter_tuning_results.csv")
-    mlflow.log_artifact("./hyperparameter_tuning_results.csv")
+    if hyperparameter_tuning:
+        results.to_csv("hyperparameter_tuning_results.csv")
+        mlflow.log_artifact("./hyperparameter_tuning_results.csv")
 
-    results_summary.to_csv("hyperparameter_tuning_results_summary.csv")
-    mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
+        results_summary.to_csv("hyperparameter_tuning_results_summary.csv")
+        mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
 
     #### Log Train Data Metrics and Artifacts
     fig_y_train.savefig('plot_data_train.png')
@@ -284,31 +304,40 @@ def run_simulation_study(
     fig_y_sampled.savefig('plot_synthetically_sampled_data.png')
     mlflow.log_artifact("./plot_synthetically_sampled_data.png")
 
+    #create table of all coefficients of the bsplines
+    bspline_table = pd.DataFrame()
+    bspline_table["bspline_1"] = nf_mctm.l2.params.detach().numpy().flatten()
+    bspline_table["bspline_2"] = nf_mctm.l4.params.detach().numpy().flatten()
+    bspline_table["bspline_3"] = nf_mctm.l6.params.detach().numpy().flatten()
+    bspline_table.to_csv("bspline_table.csv")
+    mlflow.log_artifact("./bspline_table.csv")
+
     # End the run
     print("Finished Run")
     mlflow.end_run()
 
-
-
-
 if __name__ == '__main__':
 
     run_simulation_study(
-        copula="joe",
+        experiment_id = 2,
+        copula = "t",
+        copula_par = 3,
+        train_obs = 2000,
         # Setting Hyperparameter Values
         seed_value=1,
-        penvalueridge_list=[0,10],
+        penvalueridge_list=[0],
         penfirstridge_list=[0],
         pensecondridge_list=[0],
         poly_span_abs=5,
         spline_decorrelation="bspline",
-        iterations=2,
+        iterations=1000,
         learning_rate_list=[0.5],
         patience_list=[10],
         min_delta_list=[1e-8],
-        degree_transformations_list=[20],
-        degree_decorrelation_list=[20],
-        normalisation_layer_list=[None],
+        degree_transformations_list=[10],
+        degree_decorrelation_list=[15],
+        #normalisation_layer_list=[None],
+        hyperparameter_tuning=False,
         n_samples=2000)
     #TODO: stop the plots all from showing plots
 
