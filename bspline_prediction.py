@@ -3,6 +3,28 @@ import numpy as np
 import functorch
 from reluler_layer import ReLULeR
 
+def B(x, k, i, t):
+    if k == 0:
+       return torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
+    if t[i+k] == t[i]:
+       c1 = torch.FloatTensor([0.0])
+    else:
+       c1 = (x - t[i])/(t[i+k] - t[i]) * B(x, k-1, i, t)
+    if t[i+k+1] == t[i+1]:
+       c2 = torch.FloatTensor([0.0])
+    else:
+       c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t)
+    return c1 + c2
+
+def Naive(x, t, c, p):
+    n = len(t) - p - 1 -1
+    assert (n >= p+1) and (len(c) >= n)
+    pred = x.clone()
+    for obs_num in range(x.size(0)):
+        pred[obs_num] = sum(c[i] * B(x[obs_num], p, i, t) for i in range(n))
+
+    return pred
+
 class deBoor():
     def __init__(self,t,c,p):
         self.t=t
@@ -59,7 +81,7 @@ def custom_sigmoid(input: torch.Tensor, min: float, max: float):
 
 
 # Bspline Prediction using the deBoor algorithm
-def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False):
+def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor'):
 
     order=2
     params_restricted = params_a.clone().contiguous()
@@ -75,10 +97,18 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     #input_a_clone = ReLULeR_obj.forward(input_a_clone)
     #input_a_clone = (torch.sigmoid(input_a_clone/((polynomial_range[1] - polynomial_range[0])) * 10) - 0.5) * (polynomial_range[1] - polynomial_range[0])/2
     #input_a_clone = custom_sigmoid(input=input_a_clone, min=polynomial_range[0], max=polynomial_range[1])
-    prediction = run_deBoor(x=input_a_clone,
-                            t=knots,
-                            c=params_restricted,
-                            p=order)
+
+    if calc_method == "deBoor":
+        prediction = run_deBoor(x=input_a_clone,
+                                t=knots,
+                                c=params_restricted,
+                                p=order)
+    elif calc_method == "Naive":
+        prediction = Naive(x=input_a_clone,
+                           t=knots,
+                           c=params_restricted,
+                           p=order)
+
 
     if prediction.isnan().sum() > 0:
        print("prediction contains NaNs")
