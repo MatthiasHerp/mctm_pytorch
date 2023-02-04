@@ -25,6 +25,30 @@ def Naive(x, t, c, p):
 
     return pred
 
+# cannot use vmap here as B(x, k, i, t) contains if statments which vmap does not support yet:
+# https://github.com/pytorch/functorch/issues/257
+#class Naive():
+#    def __init__(self,t,c,p):
+#        self.t=t
+#        self.c=c
+#        self.p=p
+#        self.n = t.size(0) - 2 * self.p
+#
+#    def compute_prediction(self, x):
+#        n = len(self.t) - self.p - 1 -1
+#        assert (n >= self.p+1) and (len(self.c) >= n)
+#        pred = x.clone()
+#        for obs_num in range(x.size(0)):
+#            pred[obs_num] = sum(self.c[i] * B(x[obs_num], self.p, i, self.t) for i in range(n))
+#
+#        return pred
+
+#def run_Naive(x, t, c, p):
+#    Naive_obj = Naive(t=t, c=c, p=p)
+#    Naive_func_vectorized = functorch.vmap(Naive_obj.compute_prediction)
+#
+#    return Naive_func_vectorized(torch.unsqueeze(x,0)).squeeze()
+
 class deBoor():
     def __init__(self,t,c,p):
         self.t=t
@@ -92,6 +116,10 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     knots = torch.tensor(np.linspace(polynomial_range[0]-order*distance_between_knots,
                                      polynomial_range[1]+order*distance_between_knots,
                                      n+4), dtype=torch.float32)
+    #if 0.0 in knots:
+    #    print("0 in knots") #0.25, 0.5, 0.1, 0.3, 0
+    #else:
+    #    print("0 not in knots") #0.2
 
     #ReLULeR_obj = ReLULeR(polynomial_range_abs=polynomial_range[1])
     #input_a_clone = ReLULeR_obj.forward(input_a_clone)
