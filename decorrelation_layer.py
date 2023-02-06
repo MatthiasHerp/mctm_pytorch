@@ -4,7 +4,7 @@ import numpy as np
 from bernstein_transformation_layer import bernstein_prediction
 from bspline_prediction import bspline_prediction
 
-def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False):
+def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction=None):
 
     #steps
     output = input.clone()
@@ -31,7 +31,9 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                           degree,
                                                           polynomial_range[:, covar_num],
                                                           monotonically_increasing=False,
-                                                          derivativ=0)
+                                                          derivativ=0,
+                                                          span_factor=span_factor,
+                                                          span_restriction=span_restriction)
 
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
@@ -39,7 +41,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         degree,
                                                         polynomial_range[:,covar_num],
                                                         monotonically_increasing=False,
-                                                        derivativ=0)
+                                                        derivativ=0,
+                                                        span_factor=span_factor)
                                                         #return_penalties not implemented yet
             else:
                 #input into spline
@@ -51,7 +54,9 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       polynomial_range[:,covar_num],
                                                       monotonically_increasing=False,
                                                       derivativ=0,
-                                                      return_penalties=True)
+                                                      return_penalties=True,
+                                                      span_factor=span_factor,
+                                                      span_restriction=span_restriction)
                     second_order_ridge_pen_sum += second_order_ridge_pen_current
                     first_order_ridge_pen_sum += first_order_ridge_pen_current
                     param_ridge_pen_sum += param_ridge_pen_current
@@ -63,7 +68,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         degree,
                                                         polynomial_range[:,covar_num],
                                                         monotonically_increasing=False,
-                                                        derivativ=0)
+                                                        derivativ=0,
+                                                        span_factor=span_factor)
                     second_order_ridge_pen_sum += second_order_ridge_pen_current
                     first_order_ridge_pen_sum += first_order_ridge_pen_current
                     param_ridge_pen_sum += param_ridge_pen_current
@@ -84,7 +90,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
 
 class Decorrelation(nn.Module):
-    def __init__(self, degree, number_variables, polynomial_range, spline="bspline"):
+    def __init__(self, degree, number_variables, polynomial_range, spline="bspline", span_factor=0.1, span_restriction=None):
         super().__init__()
         self.type = "decorrelation"
         self.degree  = degree
@@ -92,6 +98,10 @@ class Decorrelation(nn.Module):
         self.polynomial_range = polynomial_range
         self.num_lambdas = number_variables * (number_variables-1) / 2
         self.spline = spline
+
+        self.span_factor = span_factor
+        self.span_restriction = span_restriction
+
         # https://discuss.pytorch.org/t/how-to-turn-list-of-varying-length-tensor-into-a-tensor/1361
         # param dims: 0: basis, 1: variable
         p = torch.FloatTensor(np.repeat(np.repeat(0.1,self.degree+1), self.num_lambdas)) #(torch.rand(int(self.degree+1), int(self.num_lambdas))-0.5)
@@ -115,7 +125,8 @@ class Decorrelation(nn.Module):
                                                      self.params,
                                                      self.polynomial_range,
                                                      inverse=False,
-                                                     spline=self.spline)
+                                                     spline=self.spline,
+                                                     span_factor=self.span_factor)
         else:
             output = multivariable_lambda_prediction(input,
                                                      self.degree,
@@ -123,7 +134,8 @@ class Decorrelation(nn.Module):
                                                      self.params,
                                                      self.polynomial_range,
                                                      inverse=True,
-                                                     spline=self.spline)
+                                                     spline=self.spline,
+                                                     span_factor=self.span_factor)
 
         if return_log_d and return_penalties:
             return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum

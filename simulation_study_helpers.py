@@ -151,9 +151,9 @@ def plot_splines(layer):
     data_span_vec = data_span.reshape((100,1)).repeat(1,num_splines)
 
     if layer.type == "transformation":
-        z_tilde, log_d = layer.forward(data_span_vec, return_log_d=True, monotonically_increasing=True)
+        z_tilde, log_d = layer.forward(data_span_vec, return_log_d=True)
         z_tilde_derivativ = torch.exp(log_d).detach().numpy()
-        data_span_vec_estimated = layer.forward(z_tilde, inverse=True, monotonically_increasing=True)
+        data_span_vec_estimated = layer.forward(z_tilde, inverse=True)
         data_span_vec_estimated = data_span_vec_estimated.detach().numpy()
     elif layer.type == "decorrelation":
         z_tilde = data_span_vec.clone()

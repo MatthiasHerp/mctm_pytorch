@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import functorch
-from reluler_layer import ReLULeR
+from splines_utils import adjust_ploynomial_range, ReLULeR, custom_sigmoid
 
 def B(x, k, i, t):
     if k == 0:
@@ -95,17 +95,12 @@ def run_deBoor(x, t, c, p):
 
     return deBorr_func_vectorized(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
 
-def custom_sigmoid(input: torch.Tensor, min: float, max: float):
-    input_01 = (input - min) / (max - min)
-    input_11 = input_01 * 2 - 1
-    input_bounded_01 = 1 / (1 + torch.exp(-input_11 * 4 ))
-    input_bounded = input_bounded_01 * (max - min) + min
-
-    return input_bounded
-
-
 # Bspline Prediction using the deBoor algorithm
-def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor'):
+def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None):
+
+    # Adjust polynomial range to be a bit wider
+    # Empirically found that this helps with the fit
+    polynomial_range = adjust_ploynomial_range(polynomial_range, span_factor)
 
     order=2
     params_restricted = params_a.clone().contiguous()
@@ -116,15 +111,16 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     knots = torch.tensor(np.linspace(polynomial_range[0]-order*distance_between_knots,
                                      polynomial_range[1]+order*distance_between_knots,
                                      n+4), dtype=torch.float32)
-    #if 0.0 in knots:
-    #    print("0 in knots") #0.25, 0.5, 0.1, 0.3, 0
-    #else:
-    #    print("0 not in knots") #0.2
 
-    #ReLULeR_obj = ReLULeR(polynomial_range_abs=polynomial_range[1])
-    #input_a_clone = ReLULeR_obj.forward(input_a_clone)
     #input_a_clone = (torch.sigmoid(input_a_clone/((polynomial_range[1] - polynomial_range[0])) * 10) - 0.5) * (polynomial_range[1] - polynomial_range[0])/2
     #input_a_clone = custom_sigmoid(input=input_a_clone, min=polynomial_range[0], max=polynomial_range[1])
+
+    if span_restriction == "sigmoid":
+        input_a_clone = custom_sigmoid(input_a_clone, polynomial_range)
+    elif span_restriction == "reluler":
+        reluler = ReLULeR(polynomial_range)
+        input_a_clone = reluler.forward(input_a_clone)
+
 
     if calc_method == "deBoor":
         prediction = run_deBoor(x=input_a_clone,

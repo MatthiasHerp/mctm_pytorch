@@ -1,17 +1,20 @@
 import torch
 from torch import nn
 from flip import Flip
-from bernstein_transformation_layer import Transformation
+from bernstein_transformation_layer import *
 from decorrelation_layer import Decorrelation
 from reluler_layer import ReLULeR
 from normalisation import Normalisation
+
+from tqdm import tqdm
+from pytorch_lbfgs.LBFGS import FullBatchLBFGS
+from training_helpers import EarlyStopper
 
 
 
 class NF_MCTM(nn.Module):
     def __init__(self, input_min, input_max, polynomial_range, number_variables, spline_decorrelation="bernstein",
-                 degree_transformations=10, degree_decorrelation=12): #normalisation_layer=None
-        #TODO: define polynomial ranges for the transformation and the decorrelation layers separetly
+                 degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction=None): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
@@ -22,20 +25,27 @@ class NF_MCTM(nn.Module):
         self.degree_transformations = degree_transformations
         self.degree_decorrelation = degree_decorrelation
 
+        self.span_factor = span_factor
+        self.span_restriction = span_restriction
+
+        # Repeat polynomial ranges for all variables as this is the range for the bsplines essentially
+        polynomial_range_transformation = polynomial_range.repeat(1,self.number_variables)
+        polynomial_range_decorrelation = polynomial_range.repeat(1,self.number_variables)
+
         #if self.normalisation_layer == "bounding":
         #    self.l0 = Normalisation(input_min=self.input_min, input_max=self.input_max, output_range=polynomial_range[1]-polynomial_range[1]*0.25)
         #if self.normalisation_layer == "standardisation":
         #    self.l0 = Normalisation(input_mean=self.input_min, input_variance=self.input_max, output_range=polynomial_range[1])
 
-        self.l1 = Transformation(degree=self.degree_transformations, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3))
+        self.l1 = Transformation(degree=self.degree_transformations, number_variables=self.number_variables, polynomial_range=polynomial_range_transformation, span_factor=self.span_factor)
         #self.l12 = ReLULeR(polynomial_range_abs=self.polynomial_range[1])
-        self.l2 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l2 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor, span_restriction=self.span_restriction, spline=spline_decorrelation)
         self.l3 = Flip()
         #self.l34 = ReLULeR(polynomial_range_abs=self.polynomial_range[1])
-        self.l4 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l4 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor, span_restriction=self.span_restriction, spline=spline_decorrelation)
         self.l5 = Flip()
         #self.l56 = ReLULeR(polynomial_range_abs=self.polynomial_range[1])
-        self.l6 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=self.polynomial_range.repeat(1,3), spline=spline_decorrelation)
+        self.l6 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables, polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor, span_restriction=self.span_restriction, spline=spline_decorrelation)
 
 
     def forward(self, y, train=True):
@@ -109,5 +119,3 @@ class NF_MCTM(nn.Module):
         y = self.l1(output)
 
         return y
-
-

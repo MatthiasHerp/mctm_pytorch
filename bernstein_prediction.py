@@ -1,4 +1,5 @@
 import torch
+from splines_utils import adjust_ploynomial_range
 
 # https://github.com/pytorch/pytorch/issues/47841
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.binom.html
@@ -14,7 +15,12 @@ def torch_binom(n, v):
 def b(v, n, x):
     return torch_binom(n, v) * x**v * (1 - x)**(n - v)
 
-def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0):
+def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, span_factor=0.1):
+
+    # Adjust polynomial range to be a bit wider
+    # Empirically found that this helps with the fit
+    polynomial_range = adjust_ploynomial_range(polynomial_range, span_factor)
+
     # Restricts Monotonically increasing my insuring that params increase
     if monotonically_increasing:
 
@@ -37,6 +43,7 @@ def bernstein_prediction(params_a, input_a, degree, polynomial_range, monotonica
     second_order_ridge_pen = 0
     first_order_ridge_pen = 0
     param_ridge_pen = 0
+
 
     normalizing_range = polynomial_range[1] - polynomial_range[0]
     input_a = (input_a - polynomial_range[0]) / (normalizing_range)

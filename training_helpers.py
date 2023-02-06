@@ -100,9 +100,7 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
     for i in tqdm(range(iterations)):
         number_iterations = i
 
-        current_loss, pen_value_ridge, \
-        pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)
-        opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
+        current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
         loss_list.append(current_loss.detach().numpy().item())
 
         if verbose:
@@ -111,6 +109,9 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
         if early_stopper.early_stop(current_loss.detach().numpy()):
             print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience, "and min_delta", min_delta)
             break
+
+    # Rerun model at the end to get final penalties
+    _, pen_value_ridge, pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)
 
     return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
