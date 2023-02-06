@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from torch import optim
 from tqdm import tqdm
 import seaborn as sns
+from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
 
 def objective(y, model, penalty_params, avg = True):
     z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, train=True)
@@ -78,17 +79,22 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7):
-    opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
+def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
+    opt = FullBatchLBFGS(model.parameters(), lr=1., history_size=1, line_search='Wolfe')
+    #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
         opt.zero_grad()
         loss, pen_value_ridge, \
         pen_first_ridge, pen_second_ridge  = objective(y, model, penalty_params) # use the `objective` function
-        loss.backward() # backpropagate the loss
+        #loss.backward() # backpropagate the loss
         return loss
 
-    early_stopper = EarlyStopper(patience=patience, min_delta=min_delta)
+    early_stopper = EarlyStopper(patience=patience, min_delta=min_delta, global_min_loss=global_min_loss)
+
+    loss = closure()
+    loss.backward()
+    options = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
 
     loss_list = []
     for i in tqdm(range(iterations)):
@@ -96,7 +102,7 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
 
         current_loss, pen_value_ridge, \
         pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)
-        opt.step(closure)
+        opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
         loss_list.append(current_loss.detach().numpy().item())
 
         if verbose:
