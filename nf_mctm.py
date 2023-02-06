@@ -11,6 +11,7 @@ from normalisation import Normalisation
 class NF_MCTM(nn.Module):
     def __init__(self, input_min, input_max, polynomial_range, number_variables, spline_decorrelation="bernstein",
                  degree_transformations=10, degree_decorrelation=12): #normalisation_layer=None
+        #TODO: define polynomial ranges for the transformation and the decorrelation layers separetly
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables

@@ -57,7 +57,7 @@ def fit_1d_spline(y_true, z_true, monotonically_increasing, global_min_loss, spl
     plt.show()
 
     # 3. Fitting the model
-    opt = FullBatchLBFGS(spline_model.parameters())#,
+    opt = FullBatchLBFGS(spline_model.parameters(), lr=1., history_size=1, line_search="Wolfe")#,
                             #max_iter=20,
                             #lr=0.1,
                             #history_size=1)
@@ -125,6 +125,7 @@ class TestFit(unittest.TestCase):
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     All the takeaways are correct for the vanilla LBFGS implementation in Pytorch
     Using the better one from https://github.com/hjmshi/PyTorch-LBFGS with FullBatch LBFGS solves the problems
+    --> apparently the solution was that the LBFGS from the package had line_search="Wolfe" by default and that worked well
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     """
     def test_1(self):
