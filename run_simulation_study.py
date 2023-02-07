@@ -21,6 +21,7 @@ def run_simulation_study(
         pensecondridge_list: list,
         poly_span_abs: float,
         spline_decorrelation: str,
+        spline_inverse: str,
         iterations: int,
         learning_rate_list: list,
         patience_list: list,
@@ -28,6 +29,10 @@ def run_simulation_study(
         degree_transformations_list: list,
         degree_decorrelation_list: list,
         #normalisation_layer_list: list,
+        monotonically_increasing_inverse: bool = True,
+        span_factor: float = 0.1,
+        span_restriction: str = None,
+        degree_inverse: int = 0,
         hyperparameter_tuning: bool = True,
         n_samples: int = 2000):
 
@@ -92,6 +97,7 @@ def run_simulation_study(
     mlflow.log_param(key="min_delta", value=min_delta)
     mlflow.log_param(key="degree_transformations", value=degree_transformations)
     mlflow.log_param(key="degree_decorrelation", value=degree_decorrelation)
+    mlflow.log_param(key="spline_inverse", value=spline_inverse)
     #mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
 
     # Defining the model
@@ -109,7 +115,9 @@ def run_simulation_study(
                       number_variables=y_train.size()[1],
                       spline_decorrelation=spline_decorrelation,
                       degree_transformations=int(degree_transformations),
-                      degree_decorrelation=int(degree_decorrelation))
+                      degree_decorrelation=int(degree_decorrelation),
+                      span_factor = span_factor,
+                      span_restriction = span_restriction)
                       #normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -124,11 +132,16 @@ def run_simulation_study(
                                      verbose=False)
 
     # Training the inverse of the model
-    nf_mctm.l1.approximate_inverse(input=y_train)
+    fig_training_inverse = nf_mctm.l1.approximate_inverse(input=y_train,
+                                                          spline_inverse=spline_inverse,
+                                                          degree_inverse=degree_inverse,
+                                                          monotonically_increasing_inverse=monotonically_increasing_inverse,
+                                                          iterations=iterations,
+                                                          global_min_loss=0.001)
 
     #### Training Evaluation
 
-    fig_y_train = plot_densities(y_train)
+    fig_y_train = plot_densities(y_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
     fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1)
     fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2)
@@ -200,13 +213,15 @@ def run_simulation_study(
     y_sampled = nf_mctm.sample(n_samples=n_samples)
     y_sampled = y_sampled.detach().numpy()
     fig_y_sampled = plot_densities(y_sampled,
-                                   x_lim=[y_train[:,0].min(), y_train[:,0].max()],
-                                   y_lim=[y_train[:,1].min(), y_train[:,1].max()])
+                                   x_lim=[y_train.min(), y_train.max()],
+                                   y_lim=[y_train.min(), y_train.max()])
 
     #### Log Training Artifacts
     model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
     fig_training.savefig('plot_training.png')
     mlflow.log_artifact("./plot_training.png")
+    fig_training_inverse.savefig('plot_training_inverse.png')
+    mlflow.log_artifact("./plot_training_inverse.png")
     mlflow.log_metric("number_iterations", number_iterations)
     mlflow.log_metric("training_time", training_time)
 
@@ -328,15 +343,19 @@ if __name__ == '__main__':
         penvalueridge_list=[0],
         penfirstridge_list=[0],
         pensecondridge_list=[0],
-        poly_span_abs=5,
+        poly_span_abs=15,
         spline_decorrelation="bspline",
-        iterations=1000,
+        spline_inverse="bernstein",
+        span_factor=0.1,
+        span_restriction="reluler",
+        iterations=2000,
         learning_rate_list=[0.5],
         patience_list=[10],
         min_delta_list=[1e-8],
-        degree_transformations_list=[10],
-        degree_decorrelation_list=[15],
+        degree_transformations_list=[15],
+        degree_decorrelation_list=[40],
         #normalisation_layer_list=[None],
+        monotonically_increasing_inverse=False,
         hyperparameter_tuning=False,
         n_samples=2000)
     #TODO: stop the plots all from showing plots

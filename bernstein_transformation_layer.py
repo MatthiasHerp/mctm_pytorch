@@ -10,6 +10,7 @@ from training_helpers import EarlyStopper
 from bspline_prediction import bspline_prediction
 from bernstein_prediction import bernstein_prediction
 from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
+from splines_utils import adjust_ploynomial_range
 
 def multivariable_bernstein_prediction(input, degree, number_variables, params, polynomial_range, monotonically_increasing, spline, derivativ=0, span_factor=0.1):
     # input dims: 0: observation number, 1: variable
@@ -77,10 +78,10 @@ class Transformation(nn.Module):
         else:
             return output
 
-    def approximate_inverse(self, input, monotonically_increasing_inverse=True, spline_inverse="bernstein", degree_inverse="None", iterations=1000, patience=5, min_delta=1e-4, global_min_loss=0.001):
+    def approximate_inverse(self, input, monotonically_increasing_inverse=True, spline_inverse="bernstein", degree_inverse=0, iterations=1000, patience=5, min_delta=1e-4, global_min_loss=0.001):
         # optimization using linespace data and the forward berstein polynomial?
 
-        if degree_inverse == "None":
+        if degree_inverse == 0:
             degree_inverse = 2 * self.degree
 
         self.monotonically_increasing_inverse = monotonically_increasing_inverse
@@ -92,8 +93,10 @@ class Transformation(nn.Module):
 
         output_space = self.forward(input_space)
 
-        polynomial_range_inverse = torch.tensor([[output_space[:, 0].min()-2, output_space[:, 1].min()-2],
-                                                 [output_space[:, 0].max()+2, output_space[:, 1].max()+2]], dtype=torch.float32)
+        span_0 = output_space[:, 0].max() - output_space[:, 0].min()
+        span_1 = output_space[:, 1].max() - output_space[:, 1].min()
+        polynomial_range_inverse = torch.tensor([[output_space[:, 0].min() - span_0*self.span_factor, output_space[:, 1].min() - span_1*self.span_factor],
+                                                 [output_space[:, 0].max() + span_0*self.span_factor, output_space[:, 1].max() + span_1*self.span_factor]], dtype=torch.float32)
 
         #input_space = input
         #output_space = multivariable_bernstein_prediction(input_space, self.degree, self.number_variables, self.params, monotonically_increasing=True)
@@ -127,7 +130,7 @@ class Transformation(nn.Module):
 
         #opt_inv  = optim.Adam(inv_trans.parameters(), lr = lr, weight_decay=weight_decay)
         #scheduler_inv = optim.lr_scheduler.StepLR(opt_inv, step_size = 500, gamma = 0.5)
-        l2_losses = []
+        loss_list = []
 
         for i in tqdm(range(iterations)):
 
@@ -149,7 +152,7 @@ class Transformation(nn.Module):
             #opt.step(closure)
 
             current_loss, _, _, _, _, _, _, _ = opt.step(options)
-            l2_losses.append(current_loss.detach().numpy())
+            loss_list.append(current_loss.detach().numpy().item())
 
             if early_stopper.early_stop(current_loss.detach().numpy()):
                 print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
@@ -158,16 +161,18 @@ class Transformation(nn.Module):
 
         print("Final loss", current_loss.item())
 
-        with sns.axes_style('ticks'):
-            plt.plot(l2_losses)
-            plt.xlabel("Iteration")
-            plt.ylabel("Loss")
-        sns.despine(trim = True)
+        # Plot neg_log_likelihoods over training iterations:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.lineplot(data=loss_list, ax=ax)
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
 
         self.polynomial_range_inverse = polynomial_range_inverse
         self.params_inverse = inv_trans.params
         self.spline_inverse = spline_inverse
         self.degree_inverse = degree_inverse
+
+        return fig
 
     #TODO: repr needs to be redone
     def __repr__(self):

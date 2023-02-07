@@ -3,8 +3,6 @@ from torch import nn
 from flip import Flip
 from bernstein_transformation_layer import *
 from decorrelation_layer import Decorrelation
-from reluler_layer import ReLULeR
-from normalisation import Normalisation
 
 from tqdm import tqdm
 from pytorch_lbfgs.LBFGS import FullBatchLBFGS
@@ -14,7 +12,7 @@ from training_helpers import EarlyStopper
 
 class NF_MCTM(nn.Module):
     def __init__(self, input_min, input_max, polynomial_range, number_variables, spline_decorrelation="bernstein",
-                 degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction=None): #normalisation_layer=None
+                 degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction="None"): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
@@ -111,11 +109,11 @@ class NF_MCTM(nn.Module):
     def sample(self, n_samples):
         z = torch.distributions.Normal(0, 1).sample((n_samples, self.number_variables))
 
-        output = self.l6(z, return_log_d=False, return_penalties=False)
+        output = self.l6(z, return_log_d=False, return_penalties=False, inverse=True)
         output = self.l5(output)
-        output = self.l4(output, return_log_d=False, return_penalties=False)
+        output = self.l4(output, return_log_d=False, return_penalties=False, inverse=True)
         output = self.l3(output)
-        output = self.l2(output, return_log_d=False, return_penalties=False)
-        y = self.l1(output)
+        output = self.l2(output, return_log_d=False, return_penalties=False, inverse=True)
+        y = self.l1(output, inverse=True)
 
         return y

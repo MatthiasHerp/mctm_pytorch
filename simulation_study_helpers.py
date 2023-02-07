@@ -86,6 +86,13 @@ def evaluate_latent_space(z):
 from itertools import combinations
 
 def plot_densities(data,x_lim=None,y_lim=None):
+
+    # Ensures that by default all points are in the plot and axis have the same span (not distortion, can see distribution clearly)
+    if x_lim is None:
+        x_lim = [data.min(),data.max()]
+    if y_lim is None:
+        y_lim = [data.min(),data.max()]
+
     num_cols = data.shape[1]
     num_combinations = int(num_cols * (num_cols - 1) / 2)
 
@@ -98,10 +105,9 @@ def plot_densities(data,x_lim=None,y_lim=None):
                 sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[a])
                 sns.kdeplot(x=data[:,j], y=data[:,i], fill=True, alpha=0.9, ax=axs[a])
                 a+=1
-                if x_lim is not None:
-                    axs[a].set_xlim(x_lim)
-                if y_lim is not None:
-                    axs[a].set_ylim(y_lim)
+
+                axs[a].set_xlim(x_lim)
+                axs[a].set_ylim(y_lim)
         plt.subplots_adjust(wspace=0.05)
     else:
         fig, ax = plt.subplots(figsize=(6, 6))

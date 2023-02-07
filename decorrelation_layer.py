@@ -4,7 +4,7 @@ import numpy as np
 from bernstein_transformation_layer import bernstein_prediction
 from bspline_prediction import bspline_prediction
 
-def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction=None):
+def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction="None"):
 
     #steps
     output = input.clone()
@@ -90,7 +90,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
 
 class Decorrelation(nn.Module):
-    def __init__(self, degree, number_variables, polynomial_range, spline="bspline", span_factor=0.1, span_restriction=None):
+    def __init__(self, degree, number_variables, polynomial_range, spline="bspline", span_factor=0.1, span_restriction="None"):
         super().__init__()
         self.type = "decorrelation"
         self.degree  = degree
@@ -126,7 +126,8 @@ class Decorrelation(nn.Module):
                                                      self.polynomial_range,
                                                      inverse=False,
                                                      spline=self.spline,
-                                                     span_factor=self.span_factor)
+                                                     span_factor=self.span_factor,
+                                                     span_restriction=self.span_restriction)
         else:
             output = multivariable_lambda_prediction(input,
                                                      self.degree,
@@ -135,7 +136,8 @@ class Decorrelation(nn.Module):
                                                      self.polynomial_range,
                                                      inverse=True,
                                                      spline=self.spline,
-                                                     span_factor=self.span_factor)
+                                                     span_factor=self.span_factor,
+                                                     span_restriction=self.span_restriction)
 
         if return_log_d and return_penalties:
             return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
