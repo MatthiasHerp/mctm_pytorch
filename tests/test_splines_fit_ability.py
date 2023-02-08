@@ -95,10 +95,12 @@ def fit_1d_spline(y_true, z_true, monotonically_increasing, global_min_loss, spl
 
         opt.step(options)
 
-        if early_stopper.early_stop(current_loss.detach().numpy()):
+        if early_stopper.early_stop(current_loss.detach().numpy(), spline_model):
             print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
                   "and min_delta", min_delta)
             break
+
+    spline_model.load_state_dict(early_stopper.best_model_state)
 
     print("Final loss", current_loss.item())
 

@@ -149,9 +149,10 @@ class TestFit(unittest.TestCase):
 
         #TODO: add an aprimate inverse functionality to nf_mctm
         #TODO: finish this test, the here defined model also needs an approximate inverse
-        model.l1.approximate_inverse(y_true, iterations=300, monotonically_increasing_inverse=True)
+        model.l1.approximate_inverse(y_true, iterations=300, monotonically_increasing_inverse=True, degree_inverse=100)
+        plt.show()
 
-        plot_splines(model.l1)
+        plot_splines(model.l1,y_train=y_true)
         plt.show()
 
         y_estimated = model.l1.forward(z_estimated, inverse=True)
@@ -201,7 +202,7 @@ class TestFit(unittest.TestCase):
         #TODO: finish this test, the here defined model also needs an approximate inverse
         model.l1.approximate_inverse(y_true, iterations=300, monotonically_increasing_inverse=False)
 
-        plot_splines(model.l1)
+        plot_splines(model.l1,y_train=y_true)
         plt.show()
 
         y_estimated = model.l1.forward(z_estimated, inverse=True)
@@ -239,7 +240,7 @@ class TestFit(unittest.TestCase):
         loss_list, number_iterations, \
         pen_value_ridge, pen_first_ridge, pen_second_ridge, \
         training_time, fig = train(model, y_true, penalty_params=torch.FloatTensor([0, 0, 0]),
-                                   learning_rate=1, iterations=10, verbose=False, patience=5,
+                                   learning_rate=1, iterations=1, verbose=False, patience=5,
                                    min_delta=1e-7, return_report=True)
 
         z_estimated = model.forward(y_true, train=False)
@@ -249,9 +250,16 @@ class TestFit(unittest.TestCase):
 
         #TODO: add an aprimate inverse functionality to nf_mctm
         #TODO: finish this test, the here defined model also needs an approximate inverse
-        model.l1.approximate_inverse(y_true, iterations=300, monotonically_increasing_inverse=False, spline_inverse="bspline")
+        model.l1.approximate_inverse(y_true, iterations=200,
+                                     monotonically_increasing_inverse=True,
+                                     spline_inverse="bspline",
+                                     degree_inverse=40,
+                                     lr=0.7,
+                                     patience=20,
+                                     span_factor_inv=0.2)
+        plt.show()
 
-        plot_splines(model.l1)
+        plot_splines(model.l1,y_train=y_true)
         plt.show()
 
         y_estimated = model.l1.forward(z_estimated, inverse=True)

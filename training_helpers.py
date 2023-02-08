@@ -1,5 +1,5 @@
 import time
-
+import copy
 import torch
 from torch import nn
 import numpy as np
@@ -47,8 +47,10 @@ class EarlyStopper:
         self.min_loss = np.inf
         self.global_min_loss = global_min_loss
 
-    def early_stop(self, current_loss):
+    def early_stop(self, current_loss, model):
         if current_loss < self.min_loss:
+            #print("current loss:",current_loss," smaller than min_loss:",self.min_loss)
+            self.best_model_state = copy.deepcopy(model.state_dict())
             self.min_loss = current_loss
             self.counter = 0
 
@@ -80,7 +82,7 @@ class EarlyStopper:
 #    return neg_log_likelihoods
 
 def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
-    opt = FullBatchLBFGS(model.parameters(), lr=1., history_size=1, line_search='Wolfe')
+    opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
@@ -106,9 +108,12 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
         if verbose:
             print("Loss:",current_loss.item())
 
-        if early_stopper.early_stop(current_loss.detach().numpy()):
+        if early_stopper.early_stop(current_loss.detach().numpy(), model):
             print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience, "and min_delta", min_delta)
             break
+
+    # Return the best model which is not necessarily the last model
+    model.load_state_dict(early_stopper.best_model_state)
 
     # Rerun model at the end to get final penalties
     _, pen_value_ridge, pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)

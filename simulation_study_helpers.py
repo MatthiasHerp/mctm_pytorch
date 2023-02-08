@@ -146,12 +146,17 @@ def plot_kl_divergence_scatter(data,kl_divergence):
     return fig
 
 
-def plot_splines(layer):
+def plot_splines(layer,y_train=None):
 
     num_splines = layer.params.size()[1]
     #num_variables = layer.number_variables
-    poly_min = layer.polynomial_range[0,0]
-    poly_max = layer.polynomial_range[1,0]
+
+    if layer.type == "transformation":
+        poly_min = y_train.min()
+        poly_max = y_train.max()
+    elif layer.type == "decorrelation":
+        poly_min = layer.polynomial_range[0,0]
+        poly_max = layer.polynomial_range[1,0]
 
     data_span = torch.linspace(poly_min,poly_max,100)
     data_span_vec = data_span.reshape((100,1)).repeat(1,num_splines)

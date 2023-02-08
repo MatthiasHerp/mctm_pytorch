@@ -46,7 +46,8 @@ def run_hyperparameter_tuning(y: torch.Tensor,
                      #normalisation_layer_list]
     hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
 
-    splits = KFold(n_splits=5)
+    splits = KFold(n_splits=3) #want larger percent of data in train set? maybe another sampling method?
+                          # parallelisation even of the folds? 
 
     results = pd.DataFrame(columns=['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
                                     'patience', 'min_delta', 'degree_transformations',

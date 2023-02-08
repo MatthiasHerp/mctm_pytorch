@@ -23,6 +23,7 @@ def run_simulation_study(
         spline_decorrelation: str,
         spline_inverse: str,
         iterations: int,
+        iterations_inverse: int,
         learning_rate_list: list,
         patience_list: list,
         min_delta_list: list,
@@ -31,9 +32,11 @@ def run_simulation_study(
         #normalisation_layer_list: list,
         monotonically_increasing_inverse: bool = True,
         span_factor: float = 0.1,
+        span_factor_inverse: float = 0.1,
         span_restriction: str = None,
         degree_inverse: int = 0,
         hyperparameter_tuning: bool = True,
+        iterations_hyperparameter_tuning: int = 1500,
         n_samples: int = 2000):
 
     #experiment_id = mlflow.create_experiment(name="test_max_penalty",artifact_location="/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlflow_storage/test_sim_study/")
@@ -62,7 +65,7 @@ def run_simulation_study(
     if hyperparameter_tuning:
 
         # Running Cross validation to identify hyperparameters
-        results = run_hyperparameter_tuning(y_train, poly_span_abs, iterations, spline_decorrelation,
+        results = run_hyperparameter_tuning(y_train, poly_span_abs, iterations_hyperparameter_tuning, spline_decorrelation,
                                         penvalueridge_list, penfirstridge_list, pensecondridge_list,
                                         learning_rate_list, patience_list, min_delta_list,
                                         degree_transformations_list, degree_decorrelation_list) #normalisation_layer_list
@@ -92,12 +95,20 @@ def run_simulation_study(
     mlflow.log_param(key="poly_span_abs", value=poly_span_abs)
     mlflow.log_param(key="spline_decorrelation", value=spline_decorrelation)
     mlflow.log_param(key="iterations", value=iterations)
+    mlflow.log_param(key="iterations_inverse", value=iterations_inverse)
+    mlflow.log_param(key="monotonically_increasing_inverse", value=monotonically_increasing_inverse)
+    mlflow.log_param(key="span_factor", value=span_factor)
+    mlflow.log_param(key="span_factor_inverse", value=span_factor_inverse)
+    mlflow.log_param(key="span_restriction", value=span_restriction)
+    mlflow.log_param(key="degree_inverse", value=degree_inverse)
+    mlflow.log_param(key="hyperparameter_tuning", value=hyperparameter_tuning)
     mlflow.log_param(key="learning_rate", value=learning_rate)
     mlflow.log_param(key="patience", value=patience)
     mlflow.log_param(key="min_delta", value=min_delta)
     mlflow.log_param(key="degree_transformations", value=degree_transformations)
     mlflow.log_param(key="degree_decorrelation", value=degree_decorrelation)
     mlflow.log_param(key="spline_inverse", value=spline_inverse)
+    mlflow.log_param(key="iterations_hyperparameter_tuning", value=iterations_hyperparameter_tuning)
     #mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
 
     # Defining the model
@@ -136,14 +147,16 @@ def run_simulation_study(
                                                           spline_inverse=spline_inverse,
                                                           degree_inverse=degree_inverse,
                                                           monotonically_increasing_inverse=monotonically_increasing_inverse,
-                                                          iterations=iterations,
+                                                          iterations=iterations_inverse,
+                                                          span_factor_inverse=span_factor_inverse,
+                                                          patience=20,
                                                           global_min_loss=0.001)
 
     #### Training Evaluation
 
     fig_y_train = plot_densities(y_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
-    fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1)
+    fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1,y_train=y_train)
     fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2)
     fig_splines_decorrelation_layer_4 = plot_splines(layer= nf_mctm.l4)
     fig_splines_decorrelation_layer_6 = plot_splines(layer= nf_mctm.l6)
@@ -334,29 +347,33 @@ def run_simulation_study(
 if __name__ == '__main__':
 
     run_simulation_study(
-        experiment_id = 2,
+        experiment_id = 4,
         copula = "t",
         copula_par = 3,
         train_obs = 2000,
         # Setting Hyperparameter Values
         seed_value=1,
         penvalueridge_list=[0],
-        penfirstridge_list=[0],
-        pensecondridge_list=[0],
+        penfirstridge_list=[0,1,5],
+        pensecondridge_list=[0,1,5],
         poly_span_abs=15,
         spline_decorrelation="bspline",
         spline_inverse="bernstein",
         span_factor=0.1,
+        span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=2000,
-        learning_rate_list=[0.5],
+        iterations=10000,
+        iterations_hyperparameter_tuning=10000,
+        iterations_inverse=500,
+        learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
         degree_transformations_list=[15],
         degree_decorrelation_list=[40],
         #normalisation_layer_list=[None],
-        monotonically_increasing_inverse=False,
-        hyperparameter_tuning=False,
+        degree_inverse=40,
+        monotonically_increasing_inverse=True,
+        hyperparameter_tuning=True,
         n_samples=2000)
     #TODO: stop the plots all from showing plots
 

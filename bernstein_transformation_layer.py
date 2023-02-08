@@ -78,13 +78,14 @@ class Transformation(nn.Module):
         else:
             return output
 
-    def approximate_inverse(self, input, monotonically_increasing_inverse=True, spline_inverse="bernstein", degree_inverse=0, iterations=1000, patience=5, min_delta=1e-4, global_min_loss=0.001):
+    def approximate_inverse(self, input, monotonically_increasing_inverse=True, spline_inverse="bernstein", degree_inverse=0, iterations=1000, lr=1, patience=20, min_delta=1e-4, global_min_loss=0.001, span_factor_inverse=0.1):
         # optimization using linespace data and the forward berstein polynomial?
 
         if degree_inverse == 0:
             degree_inverse = 2 * self.degree
 
         self.monotonically_increasing_inverse = monotonically_increasing_inverse
+        self.span_factor_inverse = span_factor_inverse
 
         #a, b = torch.meshgrid([torch.linspace(input[:,0].min(),input[:,0].max(),100),torch.linspace(input[:,1].min(),input[:,1].max(),100)])
         #input_space = torch.vstack([a.flatten(),b.flatten()]).T
@@ -95,8 +96,8 @@ class Transformation(nn.Module):
 
         span_0 = output_space[:, 0].max() - output_space[:, 0].min()
         span_1 = output_space[:, 1].max() - output_space[:, 1].min()
-        polynomial_range_inverse = torch.tensor([[output_space[:, 0].min() - span_0*self.span_factor, output_space[:, 1].min() - span_1*self.span_factor],
-                                                 [output_space[:, 0].max() + span_0*self.span_factor, output_space[:, 1].max() + span_1*self.span_factor]], dtype=torch.float32)
+        polynomial_range_inverse = torch.tensor([[output_space[:, 0].min() - span_0*span_factor_inverse, output_space[:, 1].min() - span_1*span_factor_inverse],
+                                                 [output_space[:, 0].max() + span_0*span_factor_inverse, output_space[:, 1].max() + span_1*span_factor_inverse]], dtype=torch.float32)
 
         #input_space = input
         #output_space = multivariable_bernstein_prediction(input_space, self.degree, self.number_variables, self.params, monotonically_increasing=True)
@@ -111,7 +112,7 @@ class Transformation(nn.Module):
         #    return torch.sum((y_train - y_estimated)**2)
 
         #loss_mse = se()
-        opt = FullBatchLBFGS(inv_trans.parameters(), lr=1., history_size=1, line_search="Wolfe")
+        opt = FullBatchLBFGS(inv_trans.parameters(), lr=lr, history_size=1, line_search="Wolfe")
 
         loss_fct = nn.L1Loss()  # MSELoss L1Loss
         early_stopper = EarlyStopper(patience=patience, min_delta=min_delta, global_min_loss=global_min_loss)
@@ -154,12 +155,25 @@ class Transformation(nn.Module):
             current_loss, _, _, _, _, _, _, _ = opt.step(options)
             loss_list.append(current_loss.detach().numpy().item())
 
-            if early_stopper.early_stop(current_loss.detach().numpy()):
+            if early_stopper.early_stop(current_loss=current_loss.detach().numpy(), model=inv_trans):
                 print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
                       "and min_delta", min_delta)
                 break
 
-        print("Final loss", current_loss.item())
+        # Return the best model which is not necessarily the last model
+        inv_trans = Transformation(degree=degree_inverse,
+                                   number_variables=self.number_variables,
+                                   polynomial_range=polynomial_range_inverse,
+                                   monotonically_increasing=monotonically_increasing_inverse,
+                                   spline=spline_inverse)
+
+        inv_trans.load_state_dict(early_stopper.best_model_state)
+
+        #input_space_pred_final = inv_trans.forward(output_space.detach())
+        #loss_final = loss_fct(input_space_pred_final, input_space.detach())
+
+
+        print("Final loss", early_stopper.min_loss)
 
         # Plot neg_log_likelihoods over training iterations:
         fig, ax = plt.subplots(figsize=(6, 6))
