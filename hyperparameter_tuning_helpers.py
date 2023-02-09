@@ -5,9 +5,11 @@ import pandas as pd
 import numpy as np
 from nf_mctm import *
 from training_helpers import *
+import optuna
+from optuna.samplers import TPESampler
 
-
-def run_hyperparameter_tuning(y: torch.Tensor,
+def run_hyperparameter_tuning(y_train: torch.Tensor,
+                              y_validate: torch.Tensor,
                           poly_span_abs: float,
                           iterations: int,
                           spline_decorrelation: str,
@@ -45,61 +47,114 @@ def run_hyperparameter_tuning(y: torch.Tensor,
                      degree_transformations_list, degree_decorrelation_list]
                      #normalisation_layer_list]
     hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
+    penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+    patience, min_delta, degree_transformations, degree_decorrelation  = hyperparameter_combinations_list[0]
 
-    splits = KFold(n_splits=3) #want larger percent of data in train set? maybe another sampling method?
-                          # parallelisation even of the folds? 
-
-    results = pd.DataFrame(columns=['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
-                                    'patience', 'min_delta', 'degree_transformations',
-                                    'degree_decorrelation', #'normalisation_layer',
-                                    'fold','sum_validation_log_likelihood'])
-
-    for hyperparamters in hyperparameter_combinations_list:
-        penvalueridge, penfirstridge, pensecondridge, learning_rate, \
-        patience, min_delta, degree_transformations, degree_decorrelation  = hyperparamters #normalisation_layer
-
+    def optuna_objective(trial):
         # Defining the model
         poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
-        penalty_params = torch.tensor([penvalueridge,
-                                       penfirstridge,
-                                       pensecondridge])
 
-        for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
-            y_train = y[train_idx, :]
-            y_validate = y[val_idx, :]
+        penvalueridge_opt  = trial.suggest_float("penvalueridge", 0.001, 5, log=True),
+        penfirstridge_opt  = trial.suggest_float("penfirstridge", 0.001, 10, log=True),
+        pensecondridge_opt = trial.suggest_float("pensecondridge", 0.001, 20, log=True),
+        penalty_params = torch.tensor([penvalueridge_opt,
+                                       penfirstridge_opt,
+                                       pensecondridge_opt])
 
-            nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
-                              input_max=y_train.max(0).values,
-                              polynomial_range=poly_range,
-                              number_variables=y_train.size()[1],
-                              spline_decorrelation=spline_decorrelation,
-                              degree_transformations=degree_transformations,
-                              degree_decorrelation=degree_decorrelation)
-                              #normalisation_layer=normalisation_layer)
+        # for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
+        #    y_train = y[train_idx, :]
+        #    y_validate = y[val_idx, :]
 
-            train(model=nf_mctm,
-                  train_data=y_train,
-                  penalty_params=penalty_params,
-                  iterations=iterations,
-                  learning_rate=learning_rate,
-                  patience=patience,
-                  min_delta=min_delta,
-                  verbose=False,
-                  return_report=False) #no need for reporting and metrics,plots etc...
+        nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
+                          input_max=y_train.max(0).values,
+                          polynomial_range=poly_range,
+                          number_variables=y_train.size()[1],
+                          spline_decorrelation=spline_decorrelation,
+                          degree_transformations=degree_transformations,
+                          degree_decorrelation=degree_decorrelation)
+        # normalisation_layer=normalisation_layer)
 
-            sum_validation_log_likelihood = nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
+        train(model=nf_mctm,
+              train_data=y_train,
+              penalty_params=penalty_params,
+              iterations=iterations,
+              learning_rate=learning_rate,
+              patience=patience,
+              min_delta=min_delta,
+              verbose=False,
+              return_report=False)  # no need for reporting and metrics,plots etc.
 
-            results = results.append({'penvalueridge': penvalueridge, 'penfirstridge': penfirstridge,
-                                      'pensecondridge': pensecondridge, 'learning_rate': learning_rate,
-                                      'patience': patience, 'min_delta': min_delta,
-                                      'degree_transformations': degree_transformations,
-                                      'degree_decorrelation': degree_decorrelation,
-                                      #'normalisation_layer': normalisation_layer,
-                                      'fold': fold,
-                                      'sum_validation_log_likelihood': sum_validation_log_likelihood},
-                                     ignore_index=True)
+        return nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
 
-    return results
+
+    study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
+                                                   ),
+                                direction='maximize')
+    study.optimize(optuna_objective, n_trials=15)
+
+    print("hyperparameter_tuning done")
+    #list_of_lists = [penvalueridge_list, penfirstridge_list, pensecondridge_list,
+    #                 learning_rate_list,
+    #                 patience_list, min_delta_list,
+    #                 degree_transformations_list, degree_decorrelation_list]
+    #                 #normalisation_layer_list]
+    #hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
+
+    #splits = KFold(n_splits=3) #want larger percent of data in train set? maybe another sampling method?
+                          # parallelisation even of the folds? 
+
+    #results = pd.DataFrame(columns=['penvalueridge', 'penfirstridge', 'pensecondridge', 'learning_rate',
+    #                                'patience', 'min_delta', 'degree_transformations',
+    #                                'degree_decorrelation', #'normalisation_layer',
+    #                                #'fold',
+    #                                'sum_validation_log_likelihood'])
+#
+    #for hyperparamters in hyperparameter_combinations_list:
+    #    penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+    #    patience, min_delta, degree_transformations, degree_decorrelation  = hyperparamters #normalisation_layer
+#
+    #    # Defining the model
+    #    poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
+    #    penalty_params = torch.tensor([penvalueridge,
+    #                                   penfirstridge,
+    #                                   pensecondridge])
+#
+    #    #for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
+    #    #    y_train = y[train_idx, :]
+    #    #    y_validate = y[val_idx, :]
+#
+    #    nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
+    #                      input_max=y_train.max(0).values,
+    #                      polynomial_range=poly_range,
+    #                      number_variables=y_train.size()[1],
+    #                      spline_decorrelation=spline_decorrelation,
+    #                      degree_transformations=degree_transformations,
+    #                      degree_decorrelation=degree_decorrelation)
+    #                      #normalisation_layer=normalisation_layer)
+#
+    #    train(model=nf_mctm,
+    #          train_data=y_train,
+    #          penalty_params=penalty_params,
+    #          iterations=iterations,
+    #          learning_rate=learning_rate,
+    #          patience=patience,
+    #          min_delta=min_delta,
+    #          verbose=False,
+    #          return_report=False) #no need for reporting and metrics,plots etc...
+#
+    #    sum_validation_log_likelihood = nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
+
+        #results = results.append({'penvalueridge': penvalueridge, 'penfirstridge': penfirstridge,
+        #                          'pensecondridge': pensecondridge, 'learning_rate': learning_rate,
+        #                          'patience': patience, 'min_delta': min_delta,
+        #                          'degree_transformations': degree_transformations,
+        #                          'degree_decorrelation': degree_decorrelation,
+        #                          #'normalisation_layer': normalisation_layer,
+        #                          #'fold': fold,
+        #                          'sum_validation_log_likelihood': sum_validation_log_likelihood},
+        #                         ignore_index=True)
+#
+    return study
 
 
 def extract_optimal_hyperparameters(results: pd.DataFrame):
@@ -120,11 +175,15 @@ def extract_optimal_hyperparameters(results: pd.DataFrame):
     results_std = results_std.reset_index()
 
     optimal_hyperparameters = results_mean.loc[results_mean['sum_validation_log_likelihood'].idxmax()]
-    optimal_hyperparameters = optimal_hyperparameters.drop(['fold','sum_validation_log_likelihood'])
+    if 'fold' in results_mean.columns:
+        optimal_hyperparameters = optimal_hyperparameters.drop(['fold'])
+    optimal_hyperparameters = optimal_hyperparameters.drop(['sum_validation_log_likelihood'])
 
     results_mean["std_validation_log_likelihood"] = results_std["sum_validation_log_likelihood"]
     results_mean.rename(columns={'sum_validation_log_likelihood': 'mean_validation_log_likelihood)'}, inplace=True)
-    results_moments = results_mean.drop(['fold'],axis=1)
-
+    if 'fold' in results_mean.columns:
+        results_moments = results_mean.drop(['fold'],axis=1)
+    else:
+        results_moments = results_mean
     return optimal_hyperparameters.values, results_moments
 

@@ -60,20 +60,47 @@ def run_simulation_study(
     # Getting the training data
     experiment_folder = str(copula)+"_"+str(copula_par)+"_"+str(train_obs)+"/"
     y_train = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_sample_train.csv").values,dtype=torch.float32)
+    y_validate = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_sample_validate.csv").values,dtype=torch.float32)
     train_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    #validate_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_validate_log_likelihoods.csv").values,dtype=torch.float32).flatten()
 
     if hyperparameter_tuning:
 
         # Running Cross validation to identify hyperparameters
-        results = run_hyperparameter_tuning(y_train, poly_span_abs, iterations_hyperparameter_tuning, spline_decorrelation,
+        results = run_hyperparameter_tuning(y_train,
+                                            y_validate,
+                                            poly_span_abs, iterations_hyperparameter_tuning, spline_decorrelation,
                                         penvalueridge_list, penfirstridge_list, pensecondridge_list,
                                         learning_rate_list, patience_list, min_delta_list,
                                         degree_transformations_list, degree_decorrelation_list) #normalisation_layer_list
 
-        optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
-        penvalueridge, penfirstridge, pensecondridge, learning_rate, \
-        patience, min_delta, degree_transformations, \
-        degree_decorrelation  = optimal_hyperparameters #normalisation_layer
+        fig_hyperparameter_tuning_cooordinate = optuna.visualization.plot_parallel_coordinate(results)
+        fig_hyperparameter_tuning_contour = optuna.visualization.plot_contour(results)
+        fig_hyperparameter_tuning_slice = optuna.visualization.plot_slice(results)
+        fig_hyperparameter_tuning_plot_param_importances = optuna.visualization.plot_param_importances(results)
+        fig_hyperparameter_tuning_edf = optuna.visualization.plot_edf(results)
+
+        mlflow.log_figure(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html")
+        mlflow.log_figure(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html")
+        mlflow.log_figure(fig_hyperparameter_tuning_slice, "fig_hyperparameter_tuning_slice.html")
+        mlflow.log_figure(fig_hyperparameter_tuning_plot_param_importances, "fig_hyperparameter_tuning_plot_param_importances.html")
+        mlflow.log_figure(fig_hyperparameter_tuning_edf, "fig_hyperparameter_tuning_edf.html")
+
+
+        #optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
+        #penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+        #patience, min_delta, degree_transformations, \
+        #degree_decorrelation  = optimal_hyperparameters #normalisation_layer
+
+        penvalueridge = results.best_params["penvalueridge"]
+        penfirstridge = results.best_params["penfirstridge"]
+        pensecondridge = results.best_params["pensecondridge"]
+
+        learning_rate = learning_rate_list[0]
+        patience = patience_list[0]
+        min_delta = min_delta_list[0]
+        degree_transformations = degree_transformations_list[0]
+        degree_decorrelation = degree_decorrelation_list[0]
     else:
         # Setting Hyperparameter Values
         penvalueridge = penvalueridge_list[0]
@@ -254,12 +281,12 @@ def run_simulation_study(
     fig_splines_decorrelation_layer_6.savefig('plot_splines_decorrelation_layer_6.png')
     mlflow.log_artifact("./plot_splines_decorrelation_layer_6.png")
 
-    if hyperparameter_tuning:
-        results.to_csv("hyperparameter_tuning_results.csv")
-        mlflow.log_artifact("./hyperparameter_tuning_results.csv")
+    #if hyperparameter_tuning:
+        #results.to_csv("hyperparameter_tuning_results.csv")
+        #mlflow.log_artifact("./hyperparameter_tuning_results.csv")
 
-        results_summary.to_csv("hyperparameter_tuning_results_summary.csv")
-        mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
+        #results_summary.to_csv("hyperparameter_tuning_results_summary.csv")
+        #mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
 
     #### Log Train Data Metrics and Artifacts
     fig_y_train.savefig('plot_data_train.png')
@@ -354,8 +381,8 @@ if __name__ == '__main__':
         # Setting Hyperparameter Values
         seed_value=1,
         penvalueridge_list=[0],
-        penfirstridge_list=[0,1,5],
-        pensecondridge_list=[0,1,5],
+        penfirstridge_list=[0],
+        pensecondridge_list=[1],
         poly_span_abs=15,
         spline_decorrelation="bspline",
         spline_inverse="bernstein",
@@ -363,8 +390,8 @@ if __name__ == '__main__':
         span_factor_inverse=0.2,
         span_restriction="reluler",
         iterations=10000,
-        iterations_hyperparameter_tuning=10000,
-        iterations_inverse=500,
+        iterations_hyperparameter_tuning=5000,
+        iterations_inverse=2000,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
@@ -373,7 +400,7 @@ if __name__ == '__main__':
         #normalisation_layer_list=[None],
         degree_inverse=40,
         monotonically_increasing_inverse=True,
-        hyperparameter_tuning=True,
+        hyperparameter_tuning=False,
         n_samples=2000)
     #TODO: stop the plots all from showing plots
 
