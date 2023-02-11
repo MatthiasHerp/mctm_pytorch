@@ -10,7 +10,7 @@ from itertools import combinations
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch.nn as nn
-from bspline_prediction import *
+from python_nf_mctm.bspline_prediction import *
 
 def set_seeds(seed_int):
     # Reproducibility

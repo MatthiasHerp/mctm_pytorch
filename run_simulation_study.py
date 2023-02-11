@@ -1,12 +1,8 @@
-import numpy as np
 import pandas as pd
-import torch
 import mlflow
 
-from simulation_study_helpers import *
-from training_helpers import *
-from nf_mctm import *
-from hyperparameter_tuning_helpers import *
+from python_nf_mctm.simulation_study_helpers import *
+from python_nf_mctm.hyperparameter_tuning_helpers import *
 
 
 def run_simulation_study(
@@ -80,11 +76,11 @@ def run_simulation_study(
         fig_hyperparameter_tuning_plot_param_importances = optuna.visualization.plot_param_importances(results)
         fig_hyperparameter_tuning_edf = optuna.visualization.plot_edf(results)
 
-        mlflow.log_figure(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html")
-        mlflow.log_figure(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html")
-        mlflow.log_figure(fig_hyperparameter_tuning_slice, "fig_hyperparameter_tuning_slice.html")
-        mlflow.log_figure(fig_hyperparameter_tuning_plot_param_importances, "fig_hyperparameter_tuning_plot_param_importances.html")
-        mlflow.log_figure(fig_hyperparameter_tuning_edf, "fig_hyperparameter_tuning_edf.html")
+        #mlflow.log_figure(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html")
+        #mlflow.log_figure(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html")
+        #mlflow.log_figure(fig_hyperparameter_tuning_slice, "fig_hyperparameter_tuning_slice.html")
+        #mlflow.log_figure(fig_hyperparameter_tuning_plot_param_importances, "fig_hyperparameter_tuning_plot_param_importances.html")
+        #mlflow.log_figure(fig_hyperparameter_tuning_edf, "fig_hyperparameter_tuning_edf.html")
 
 
         #optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
@@ -92,7 +88,7 @@ def run_simulation_study(
         #patience, min_delta, degree_transformations, \
         #degree_decorrelation  = optimal_hyperparameters #normalisation_layer
 
-        penvalueridge = results.best_params["penvalueridge"]
+        penvalueridge = penvalueridge_list[0]
         penfirstridge = results.best_params["penfirstridge"]
         pensecondridge = results.best_params["pensecondridge"]
 
@@ -181,6 +177,8 @@ def run_simulation_study(
 
     #### Training Evaluation
 
+    sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
+
     fig_y_train = plot_densities(y_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
     fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1,y_train=y_train)
@@ -264,6 +262,7 @@ def run_simulation_study(
     mlflow.log_artifact("./plot_training_inverse.png")
     mlflow.log_metric("number_iterations", number_iterations)
     mlflow.log_metric("training_time", training_time)
+    mlflow.log_metric("sum_log_likelihood_validation", sum_log_likelihood_val)
 
     mlflow.log_metric("pen_value_ridge_final", pen_value_ridge_final)
     mlflow.log_metric("pen_first_ridge_final", pen_first_ridge_final)
@@ -374,7 +373,7 @@ def run_simulation_study(
 if __name__ == '__main__':
 
     run_simulation_study(
-        experiment_id = 4,
+        experiment_id = 0,
         copula = "t",
         copula_par = 3,
         train_obs = 2000,
@@ -389,9 +388,9 @@ if __name__ == '__main__':
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=10000,
+        iterations=10,
         iterations_hyperparameter_tuning=5000,
-        iterations_inverse=2000,
+        iterations_inverse=1,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],

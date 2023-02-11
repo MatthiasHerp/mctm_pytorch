@@ -1,16 +1,10 @@
 import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-import numpy as np
 import unittest
 
-from training_helpers import *
-from decorrelation_layer import *
-from simulation_study_helpers import *
+from python_nf_mctm.training_helpers import *
+from python_nf_mctm.decorrelation_layer import *
+from python_nf_mctm.simulation_study_helpers import *
 
-from tqdm import tqdm
-from pytorch_lbfgs.LBFGS import FullBatchLBFGS
-from training_helpers import EarlyStopper
 
 class Decorrelation_Model(nn.Module):
     def __init__(self, polynomial_range, number_variables, degree_transformations=10, degree_decorrelation=10, span_factor=0.1, span_restriction=None, spline_decorrlation="bspline"):

@@ -1,8 +1,5 @@
-import torch
-
-from decorrelation_layer import *
-from training_helpers import *
-from nf_mctm import *
+from python_nf_mctm.training_helpers import *
+from python_nf_mctm.nf_mctm import *
 
 
 if __name__ == '__main__':

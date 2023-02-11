@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import functorch
-from splines_utils import adjust_ploynomial_range, ReLULeR, custom_sigmoid
+from python_nf_mctm.splines_utils import adjust_ploynomial_range, ReLULeR, custom_sigmoid
 
 def B(x, k, i, t):
     if k == 0:

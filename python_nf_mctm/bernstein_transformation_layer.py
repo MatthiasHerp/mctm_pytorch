@@ -6,13 +6,14 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 
-from training_helpers import EarlyStopper
-from bspline_prediction import bspline_prediction
-from bernstein_prediction import bernstein_prediction
+from python_nf_mctm.training_helpers import EarlyStopper
+from python_nf_mctm.bspline_prediction import bspline_prediction
+from python_nf_mctm.bernstein_prediction import bernstein_prediction
 from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
-from splines_utils import adjust_ploynomial_range
+from python_nf_mctm.splines_utils import adjust_ploynomial_range
 
-def multivariable_bernstein_prediction(input, degree, number_variables, params, polynomial_range, monotonically_increasing, spline, derivativ=0, span_factor=0.1):
+def multivariable_bernstein_prediction(input, degree, number_variables, params, polynomial_range, monotonically_increasing, spline, derivativ=0, span_factor=0.1,
+                                       covariate=None,params_covariate=None):
     # input dims: 0: observation number, 1: variable
     # cloning tipp from here: https://discuss.pytorch.org/t/encounter-the-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/836/10
     output = input.clone()
@@ -25,10 +26,12 @@ def multivariable_bernstein_prediction(input, degree, number_variables, params, 
 
         if spline == "bernstein":
             output[:,var_num], second_order_ridge_pen_current, \
-            first_order_ridge_pen_current, param_ridge_pen_current = bernstein_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ, span_factor=span_factor)
+            first_order_ridge_pen_current, param_ridge_pen_current = bernstein_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ, span_factor=span_factor,
+                                                                                          covariate=covariate, params_covariate=params_covariate)
         elif spline == "bspline":
             output[:,var_num], second_order_ridge_pen_current, \
-            first_order_ridge_pen_current, param_ridge_pen_current = bspline_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ, return_penalties=True, span_factor=span_factor)
+            first_order_ridge_pen_current, param_ridge_pen_current = bspline_prediction(params[:,var_num], input[:,var_num], degree, polynomial_range[:,var_num], monotonically_increasing, derivativ, return_penalties=True, span_factor=span_factor,
+                                                                                        covariate=covariate, params_covariate=params_covariate)
 
         second_order_ridge_pen_sum += second_order_ridge_pen_current
         first_order_ridge_pen_sum += first_order_ridge_pen_current
@@ -47,7 +50,8 @@ def compute_starting_values_berstein_polynomials(degree,min,max,number_variables
     return par_restricted_opt
 
 class Transformation(nn.Module):
-    def __init__(self, degree, number_variables, polynomial_range, monotonically_increasing=True, spline="bernstein", span_factor=0.1):
+    def __init__(self, degree, number_variables, polynomial_range, monotonically_increasing=True, spline="bernstein", span_factor=0.1,
+                 covariate=None, params_covariate=None):
         super().__init__()
         self.type = "transformation"
         self.degree  = degree
@@ -63,6 +67,9 @@ class Transformation(nn.Module):
 
         self.span_factor = span_factor
 
+        self.covariate = covariate
+        self.params_covariate = params_covariate
+
     def forward(self, input, log_d = 0, inverse = False, return_log_d = False):
         # input dims: 0: observaton number, 1: variable
         if not inverse:
@@ -71,7 +78,8 @@ class Transformation(nn.Module):
             log_d = log_d + torch.log(output_first_derivativ) # Error this is false we require the derivativ of the bernstein polynomial!332'
             # took out torch.abs(), misunderstanding, determinant can be a negativ value (flipping of the coordinate system)
         else:
-            output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_bernstein_prediction(input, self.degree_inverse, self.number_variables, self.params_inverse, self.polynomial_range_inverse, self.monotonically_increasing_inverse, spline=self.spline_inverse, span_factor=self.span_factor)
+            output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_bernstein_prediction(input, self.degree_inverse, self.number_variables, self.params_inverse, self.polynomial_range_inverse, self.monotonically_increasing_inverse, spline=self.spline_inverse, span_factor=self.span_factor,
+                                                                                                                                    covariate=self.covariate, params_covariate=self.params_covariate)
 
         if return_log_d==True:
             return output, log_d

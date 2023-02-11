@@ -2,15 +2,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 import unittest
-from bernstein_prediction import bernstein_prediction
-from bernstein_transformation_layer import compute_starting_values_berstein_polynomials
-from bspline_prediction import bspline_prediction
-from training_helpers import EarlyStopper
+from python_nf_mctm.bernstein_prediction import bernstein_prediction
+from python_nf_mctm.bspline_prediction import bspline_prediction
+from python_nf_mctm.training_helpers import EarlyStopper
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
+from pytorch_lbfgs.LBFGS import FullBatchLBFGS
 
 def fit_1d_spline(y_true, z_true, monotonically_increasing, global_min_loss, spline="bernstein"):
 

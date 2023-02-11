@@ -1,13 +1,9 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import torch
 import mlflow
 
-from simulation_study_helpers import *
-from training_helpers import *
-from nf_mctm import *
-from hyperparameter_tuning_helpers import *
+from python_nf_mctm.simulation_study_helpers import *
+from python_nf_mctm.hyperparameter_tuning_helpers import *
 
 if __name__ == "__main__":
     experiment_data = mlflow.search_runs(experiment_ids=["2"])

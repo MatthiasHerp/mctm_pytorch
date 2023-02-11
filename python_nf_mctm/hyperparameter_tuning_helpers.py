@@ -3,8 +3,8 @@ import itertools
 from sklearn.model_selection import KFold
 import pandas as pd
 import numpy as np
-from nf_mctm import *
-from training_helpers import *
+from python_nf_mctm.nf_mctm import *
+from python_nf_mctm.training_helpers import *
 import optuna
 from optuna.samplers import TPESampler
 
@@ -54,9 +54,10 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
         # Defining the model
         poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
 
-        penvalueridge_opt  = trial.suggest_float("penvalueridge", 0.001, 5, log=True),
-        penfirstridge_opt  = trial.suggest_float("penfirstridge", 0.001, 10, log=True),
-        pensecondridge_opt = trial.suggest_float("pensecondridge", 0.001, 20, log=True),
+        #penvalueridge_opt  = trial.suggest_float("penvalueridge", 0.001, 5, log=True),
+        penvalueridge_opt = 0
+        penfirstridge_opt  = trial.suggest_float("penfirstridge", 0.001, 10, log=True)
+        pensecondridge_opt = trial.suggest_float("pensecondridge", 0.001, 20, log=True)
         penalty_params = torch.tensor([penvalueridge_opt,
                                        penfirstridge_opt,
                                        pensecondridge_opt])
@@ -88,7 +89,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
 
 
     study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
-                                                   ),
+                                                   prior_weight=0),
                                 direction='maximize')
     study.optimize(optuna_objective, n_trials=15)
 

@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 import numpy as np
-from bernstein_transformation_layer import bernstein_prediction
-from bspline_prediction import bspline_prediction
+from python_nf_mctm.bernstein_transformation_layer import bernstein_prediction
+from python_nf_mctm.bspline_prediction import bspline_prediction
 
 def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction="None"):
 

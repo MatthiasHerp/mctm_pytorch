@@ -1,8 +1,7 @@
-from bspline_prediction import bspline_prediction
-from bernstein_transformation_layer import bernstein_prediction, compute_starting_values_berstein_polynomials
+from python_nf_mctm.bernstein_transformation_layer import bernstein_prediction, compute_starting_values_berstein_polynomials
 import torch
 import torch.nn as nn
-from training_helpers import EarlyStopper
+from python_nf_mctm.training_helpers import EarlyStopper
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt

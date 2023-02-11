@@ -1,13 +1,8 @@
 import torch
 from torch import nn
-from flip import Flip
-from bernstein_transformation_layer import *
-from decorrelation_layer import Decorrelation
-
-from tqdm import tqdm
-from pytorch_lbfgs.LBFGS import FullBatchLBFGS
-from training_helpers import EarlyStopper
-
+from python_nf_mctm.flip import Flip
+from python_nf_mctm.bernstein_transformation_layer import *
+from python_nf_mctm.decorrelation_layer import Decorrelation
 
 
 class NF_MCTM(nn.Module):
@@ -100,6 +95,9 @@ class NF_MCTM(nn.Module):
         return z
 
     def log_likelihood(self, y):
+        #TODO: run this log_likelihood code and the sample code with torch.no_grad() to speed up the code
+        # https://pytorch.org/docs/stable/generated/torch.no_grad.html#torch.no_grad
+        # with torch.no_grad():
         z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y,train=True)
         log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
         log_likelihood = log_likelihood_latent + log_d #now a minus here

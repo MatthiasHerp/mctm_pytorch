@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import unittest
-from bspline_prediction import bspline_prediction
+from python_nf_mctm.bspline_prediction import bspline_prediction
 
 class TestPrediction(unittest.TestCase):
     """
