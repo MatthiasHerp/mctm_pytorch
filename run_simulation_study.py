@@ -373,7 +373,7 @@ def run_simulation_study(
 if __name__ == '__main__':
 
     run_simulation_study(
-        experiment_id = 0,
+        experiment_id = 2,
         copula = "t",
         copula_par = 3,
         train_obs = 2000,

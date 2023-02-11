@@ -96,7 +96,8 @@ def run_deBoor(x, t, c, p):
     return deBorr_func_vectorized(torch.unsqueeze(x,0), torch.unsqueeze(k,0)).squeeze()
 
 # Bspline Prediction using the deBoor algorithm
-def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None):
+def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None,
+                       covariate=False, params_covariate=False):
 
     # Adjust polynomial range to be a bit wider
     # Empirically found that this helps with the fit
@@ -133,6 +134,21 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
                            c=params_restricted,
                            p=order)
 
+    # Adding Covariate in a GAM manner
+    if covariate is not False:
+        params_covariate_restricted = params_covariate.clone().contiguous()
+
+        knots_covariate = torch.tensor(np.linspace(0 - order * 1,
+                                         1 + order * 1,
+                                         n + 4), dtype=torch.float32)
+
+        prediction_covariate = run_deBoor(x=covariate,
+                                t=knots_covariate,
+                                c=params_covariate_restricted,
+                                p=order)
+
+        prediction = prediction + prediction_covariate
+
 
     if prediction.isnan().sum() > 0:
        print("prediction contains NaNs")
@@ -144,6 +160,14 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
         second_order_ridge_pen = torch.sum(torch.diff(params_restricted,n=2)**2)
         first_order_ridge_pen = torch.sum(torch.diff(params_restricted,n=1)**2)
         param_ridge_pen = torch.sum(params_restricted**2)
+
+        # Adding Covariate parameter penalisation values
+        if covariate is not False:
+            second_order_ridge_pen += torch.sum(torch.diff(params_covariate_restricted, n=2) ** 2)
+            first_order_ridge_pen += torch.sum(torch.diff(params_covariate_restricted, n=1) ** 2)
+            param_ridge_pen += torch.sum(params_covariate_restricted ** 2)
+
+
         return prediction, second_order_ridge_pen, first_order_ridge_pen, param_ridge_pen
     else:
         return prediction
