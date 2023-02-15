@@ -4,6 +4,13 @@ import mlflow
 from python_nf_mctm.simulation_study_helpers import *
 from python_nf_mctm.hyperparameter_tuning_helpers import *
 
+def log_mlflow_plot(fig,file_name,type="plt"):
+    if type == "plt":
+        fig.savefig(file_name)
+    elif type == "plotly":
+        fig.write_html(file_name)
+
+    mlflow.log_artifact("./"+file_name)
 
 def run_simulation_study(
         experiment_id: int,
@@ -102,11 +109,11 @@ def run_simulation_study(
         fig_hyperparameter_tuning_edf = optuna.visualization.plot_edf(results)
         #TODO: store the hyperparameter tuning figures as artifacts
 
-        #mlflow.log_figure(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html")
-        #mlflow.log_figure(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html")
-        #mlflow.log_figure(fig_hyperparameter_tuning_slice, "fig_hyperparameter_tuning_slice.html")
-        #mlflow.log_figure(fig_hyperparameter_tuning_plot_param_importances, "fig_hyperparameter_tuning_plot_param_importances.html")
-        #mlflow.log_figure(fig_hyperparameter_tuning_edf, "fig_hyperparameter_tuning_edf.html")
+        log_mlflow_plot(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html", type="plotly")
+        log_mlflow_plot(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html", type="plotly")
+        log_mlflow_plot(fig_hyperparameter_tuning_slice, "fig_hyperparameter_tuning_slice.html", type="plotly")
+        log_mlflow_plot(fig_hyperparameter_tuning_plot_param_importances, "fig_hyperparameter_tuning_plot_param_importances.html", type="plotly")
+        log_mlflow_plot(fig_hyperparameter_tuning_edf, "fig_hyperparameter_tuning_edf.html", type="plotly")
 
 
         #optimal_hyperparameters, results_summary = extract_optimal_hyperparameters(results)
@@ -291,10 +298,14 @@ def run_simulation_study(
 
     #### Log Training Artifacts
     model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
-    fig_training.savefig('plot_training.png')
-    mlflow.log_artifact("./plot_training.png")
-    fig_training_inverse.savefig('plot_training_inverse.png')
-    mlflow.log_artifact("./plot_training_inverse.png")
+
+    log_mlflow_plot(fig_training,'plot_training.png')
+    log_mlflow_plot(fig_training_inverse,'plot_training_inverse.png')
+
+    #fig_training.savefig('plot_training.png')
+    #mlflow.log_artifact("./plot_training.png")
+    #fig_training_inverse.savefig('plot_training_inverse.png')
+    #mlflow.log_artifact("./plot_training_inverse.png")
     mlflow.log_metric("number_iterations", number_iterations)
     mlflow.log_metric("training_time", training_time)
     mlflow.log_metric("sum_log_likelihood_validation", sum_log_likelihood_val)
@@ -306,14 +317,19 @@ def run_simulation_study(
     np.save("loss_training_iterations.npy", loss_training_iterations)
     mlflow.log_artifact("./loss_training_iterations.npy")
 
-    fig_splines_transformation_layer_1.savefig('plot_splines_transformation_layer_1.png')
-    mlflow.log_artifact("./plot_splines_transformation_layer_1.png")
-    fig_splines_decorrelation_layer_2.savefig('plot_splines_decorrelation_layer_2.png')
-    mlflow.log_artifact("./plot_splines_decorrelation_layer_2.png")
-    fig_splines_decorrelation_layer_4.savefig('plot_splines_decorrelation_layer_4.png')
-    mlflow.log_artifact("./plot_splines_decorrelation_layer_4.png")
-    fig_splines_decorrelation_layer_6.savefig('plot_splines_decorrelation_layer_6.png')
-    mlflow.log_artifact("./plot_splines_decorrelation_layer_6.png")
+    log_mlflow_plot(fig_splines_transformation_layer_1,'plot_splines_transformation_layer_1.png')
+    log_mlflow_plot(fig_splines_decorrelation_layer_2,'plot_splines_decorrelation_layer_2.png')
+    log_mlflow_plot(fig_splines_decorrelation_layer_4,'plot_splines_decorrelation_layer_4.png')
+    log_mlflow_plot(fig_splines_decorrelation_layer_6,'plot_splines_decorrelation_layer_6.png')
+
+    #fig_splines_transformation_layer_1.savefig('plot_splines_transformation_layer_1.png')
+    #mlflow.log_artifact("./plot_splines_transformation_layer_1.png")
+    #fig_splines_decorrelation_layer_2.savefig('plot_splines_decorrelation_layer_2.png')
+    #mlflow.log_artifact("./plot_splines_decorrelation_layer_2.png")
+    #fig_splines_decorrelation_layer_4.savefig('plot_splines_decorrelation_layer_4.png')
+    #mlflow.log_artifact("./plot_splines_decorrelation_layer_4.png")
+    #fig_splines_decorrelation_layer_6.savefig('plot_splines_decorrelation_layer_6.png')
+    #mlflow.log_artifact("./plot_splines_decorrelation_layer_6.png")
 
     #if hyperparameter_tuning:
         #results.to_csv("hyperparameter_tuning_results.csv")
@@ -323,8 +339,9 @@ def run_simulation_study(
         #mlflow.log_artifact("./hyperparameter_tuning_results_summary.csv")
 
     #### Log Train Data Metrics and Artifacts
-    fig_y_train.savefig('plot_data_train.png')
-    mlflow.log_artifact("./plot_data_train.png")
+    log_mlflow_plot(fig_y_train,'plot_data_train.png')
+    #fig_y_train.savefig('plot_data_train.png')
+    #mlflow.log_artifact("./plot_data_train.png")
 
     mlflow.log_metric("mv_normality_result_train", res_normal_train)
     mlflow.log_metric("mv_normality_pval_train", res_pval_train)
@@ -338,25 +355,30 @@ def run_simulation_study(
     np.save("uv_normality_pvals_train.npy", p_train)
     mlflow.log_artifact("./uv_normality_pvals_train.npy")
 
-    fig_z_train.savefig('plot_latent_space_train.png')
-    mlflow.log_artifact("./plot_latent_space_train.png")
+    log_mlflow_plot(fig_z_train,'plot_latent_space_train.png')
+    #fig_z_train.savefig('plot_latent_space_train.png')
+    #mlflow.log_artifact("./plot_latent_space_train.png")
 
     mlflow.log_metric("kl_divergence_nf_mctm_train", kl_divergence_nf_mctm_train)
     mlflow.log_metric("kl_divergence_true_model_train", kl_divergence_true_model_train)
     mlflow.log_metric("kl_divergence_mvn_model_train", kl_divergence_mvn_model_train)
 
-    fig_kl_divergence_nf_mctm_train.savefig('plot_kl_divergence_nf_mctm_train.png')
-    mlflow.log_artifact("./plot_kl_divergence_nf_mctm_train.png")
+    log_mlflow_plot(fig_kl_divergence_nf_mctm_train,'plot_kl_divergence_nf_mctm_train.png')
+    #fig_kl_divergence_nf_mctm_train.savefig('plot_kl_divergence_nf_mctm_train.png')
+    #mlflow.log_artifact("./plot_kl_divergence_nf_mctm_train.png")
 
-    fig_kl_divergence_true_model_train.savefig('plot_kl_divergence_true_model_train.png')
-    mlflow.log_artifact("./plot_kl_divergence_true_model_train.png")
+    log_mlflow_plot(fig_kl_divergence_true_model_train,'plot_kl_divergence_true_model_train.png')
+    #fig_kl_divergence_true_model_train.savefig('plot_kl_divergence_true_model_train.png')
+    #mlflow.log_artifact("./plot_kl_divergence_true_model_train.png")
 
-    fig_kl_divergence_mvn_model_train.savefig('plot_kl_divergence_mvn_model_train.png')
-    mlflow.log_artifact("./plot_kl_divergence_mvn_model_train.png")
+    log_mlflow_plot(fig_kl_divergence_mvn_model_train,'plot_kl_divergence_mvn_model_train.png')
+    #fig_kl_divergence_mvn_model_train.savefig('plot_kl_divergence_mvn_model_train.png')
+    #mlflow.log_artifact("./plot_kl_divergence_mvn_model_train.png")
 
     #### Log Test Data Metrics and Artifacts
-    fig_y_test.savefig('plot_data_test.png')
-    mlflow.log_artifact("./plot_data_test.png")
+    log_mlflow_plot(fig_y_test,'plot_data_test.png')
+    #fig_y_test.savefig('plot_data_test.png')
+    #mlflow.log_artifact("./plot_data_test.png")
 
     mlflow.log_metric("mv_normality_result_test", res_normal_test)
     mlflow.log_metric("mv_normality_pval_test", res_pval_test)
@@ -370,28 +392,33 @@ def run_simulation_study(
     np.save("uv_normality_pvals_test.npy", p_test)
     mlflow.log_artifact("./uv_normality_pvals_test.npy")
 
-    fig_z_test.savefig('plot_latent_space_test.png')
-    mlflow.log_artifact("./plot_latent_space_test.png")
+    log_mlflow_plot(fig_z_test,'plot_latent_space_test.png')
+    #fig_z_test.savefig('plot_latent_space_test.png')
+    #mlflow.log_artifact("./plot_latent_space_test.png")
 
     mlflow.log_metric("kl_divergence_nf_mctm_test", kl_divergence_nf_mctm_test)
     mlflow.log_metric("kl_divergence_true_model_test", kl_divergence_true_model_test)
     mlflow.log_metric("kl_divergence_mvn_model_test", kl_divergence_mvn_model_test)
 
-    fig_kl_divergence_nf_mctm_test.savefig('plot_kl_divergence_nf_mctm_test.png')
-    mlflow.log_artifact("./plot_kl_divergence_nf_mctm_test.png")
+    log_mlflow_plot(fig_kl_divergence_nf_mctm_test,'plot_kl_divergence_nf_mctm_test.png')
+    #fig_kl_divergence_nf_mctm_test.savefig('plot_kl_divergence_nf_mctm_test.png')
+    #mlflow.log_artifact("./plot_kl_divergence_nf_mctm_test.png")
 
-    fig_kl_divergence_true_model_test.savefig('plot_kl_divergence_true_model_test.png')
-    mlflow.log_artifact("./plot_kl_divergence_true_model_test.png")
+    log_mlflow_plot(fig_kl_divergence_true_model_test,'plot_kl_divergence_true_model_test.png')
+    #fig_kl_divergence_true_model_test.savefig('plot_kl_divergence_true_model_test.png')
+    #mlflow.log_artifact("./plot_kl_divergence_true_model_test.png")
 
-    fig_kl_divergence_mvn_model_test.savefig('plot_kl_divergence_mvn_model_test.png')
-    mlflow.log_artifact("./plot_kl_divergence_mvn_model_test.png")
+    log_mlflow_plot(fig_kl_divergence_mvn_model_test,'plot_kl_divergence_mvn_model_test.png')
+    #fig_kl_divergence_mvn_model_test.savefig('plot_kl_divergence_mvn_model_test.png')
+    #mlflow.log_artifact("./plot_kl_divergence_mvn_model_test.png")
 
     #### Log Sampling Aritfacts
     np.save("synthetically_sampled_data.npy", y_sampled)
     mlflow.log_artifact("./synthetically_sampled_data.npy")
 
-    fig_y_sampled.savefig('plot_synthetically_sampled_data.png')
-    mlflow.log_artifact("./plot_synthetically_sampled_data.png")
+    log_mlflow_plot(fig_y_sampled,'plot_synthetically_sampled_data.png')
+    #fig_y_sampled.savefig('plot_synthetically_sampled_data.png')
+    #mlflow.log_artifact("./plot_synthetically_sampled_data.png")
 
     #create table of all coefficients of the bsplines
     bspline_table = pd.DataFrame()
