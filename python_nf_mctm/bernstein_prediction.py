@@ -56,6 +56,7 @@ def kron(input_basis, covariate_basis):
 
 
 def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_factor, derivativ=0, covariate=False):
+    # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     if covariate is not False:
         multivariate_bernstein_basis = torch.empty(size=(input.size(0), (degree+1)*(degree+1), input.size(1)))

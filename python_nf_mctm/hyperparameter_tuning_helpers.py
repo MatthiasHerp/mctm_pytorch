@@ -96,9 +96,12 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
 
         return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
 
-
+    # docs: https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html#optuna.samplers.TPESampler
     study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
-                                                   prior_weight=0),
+                                                   consider_prior=True, # is this useful without a prior weight?
+                                                   prior_weight=0, #default value 1.0 but then does not explore the space as good I think
+                                                   multivariate=True # experimental but very useful here as our parameters are highly correlated
+                                                   ),
                                 direction='maximize')
     study.optimize(optuna_objective, n_trials=15)
 

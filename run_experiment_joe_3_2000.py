@@ -1,18 +1,22 @@
 import mlflow
 from run_simulation_study import run_simulation_study
+import torch
 
 if __name__ == "__main__":
 
-    #iopwwwwwwwwmlflow.create_experiment(name="joe_3_2000")
+    mlflow.create_experiment(name="joe_3_2000")#, artifact_location="/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlflow_storage/test_sim_study/")
     experiment = mlflow.get_experiment_by_name("joe_3_2000")
 
-
+    # source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
+    torch.set_num_interop_threads(50)  # Inter-op parallelism
+    torch.set_num_threads(50)  # Intra-op parallelism
 
     for seed_num in range(1,50):
 
         run_simulation_study(
                 experiment_id = experiment.experiment_id,
                 copula = "joe",
+                covariate_exists=False,
                 copula_par = 3,
                 train_obs = 2000,
                 # Setting Hyperparameter Values
@@ -26,9 +30,9 @@ if __name__ == "__main__":
                 span_factor=0.1,
                 span_factor_inverse=0.2,
                 span_restriction="reluler",
-                iterations=10,
+                iterations=10000,
                 iterations_hyperparameter_tuning=5000,
-                iterations_inverse=1,
+                iterations_inverse=10000,
                 learning_rate_list=[1.],
                 patience_list=[10],
                 min_delta_list=[1e-8],
