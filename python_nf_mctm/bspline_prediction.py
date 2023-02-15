@@ -147,7 +147,7 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
                                 c=params_covariate_restricted,
                                 p=order)
 
-        prediction = prediction + prediction_covariate
+        prediction = prediction * prediction_covariate
 
 
     if prediction.isnan().sum() > 0:

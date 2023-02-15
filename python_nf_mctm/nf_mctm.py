@@ -48,7 +48,7 @@ class NF_MCTM(nn.Module):
                                 number_covariates=self.number_covariates)
 
 
-    def forward(self, y, covariate=False, train=True):
+    def forward(self, y, covariate=False, train=True, evaluate=True):
         # Normalisation
         #if  self.normalisation_layer is not None:
         #    output = self.l0.forward(y)
@@ -56,8 +56,14 @@ class NF_MCTM(nn.Module):
         #    output = y
 
         # Training or evaluation
-        if train:
-            output, log_d = self.l1(y, covariate, return_log_d = True)
+        if train or evaluate:
+
+            if train:
+                # new input false to not recompute basis each iteration
+                output, log_d = self.l1(y, covariate, return_log_d = True, new_input = False)
+            elif evaluate:
+                # new input true as we need to recompute the basis for the validation/test set
+                output, log_d = self.l1(y, covariate, return_log_d=True, new_input = True)
 
             #output = self.l12(output)
 
@@ -85,7 +91,8 @@ class NF_MCTM(nn.Module):
             return output, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global
 
         else:
-            output = self.l1(y, covariate)
+            # new input true as we need to recompute the basis for the validation/test set
+            output = self.l1(y, covariate, new_input=True)
             #output = self.l12(output)
             output = self.l2(output, covariate, return_log_d=False, return_penalties=False)
             output = self.l3(output)
@@ -98,14 +105,14 @@ class NF_MCTM(nn.Module):
             return output
 
     def latent_space_representation(self, y, covariate=False):
-        z = self.forward(y, covariate, train=False)
+        z = self.forward(y, covariate, train=False, evaluate=False)
         return z
 
-    def log_likelihood(self, y):
+    def log_likelihood(self, y, covariate=False):
         #TODO: run this log_likelihood code and the sample code with torch.no_grad() to speed up the code
         # https://pytorch.org/docs/stable/generated/torch.no_grad.html#torch.no_grad
         # with torch.no_grad():
-        z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y,train=True)
+        z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y, covariate=covariate, evaluate=True, train=False)
         log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
         log_likelihood = log_likelihood_latent + log_d #now a minus here
         vec_log_likelihood = log_likelihood.sum(1)

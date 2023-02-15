@@ -10,6 +10,7 @@ def run_simulation_study(
         copula: str,
         copula_par: float,
         train_obs: int,
+        covariate_exists: str,
         # Setting Hyperparameter Values
         seed_value: int,
         penvalueridge_list: list,
@@ -35,12 +36,24 @@ def run_simulation_study(
         iterations_hyperparameter_tuning: int = 1500,
         n_samples: int = 2000):
 
+    #TODO: harmonize the covariate arguement (have number_covariates, covariate_exists, covariate, also = False etc..)
+
     #experiment_id = mlflow.create_experiment(name="test_max_penalty",artifact_location="/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlflow_storage/test_sim_study/")
 
+    data_folder = "simulation_study_data/"+str(copula)+"_"+str(copula_par)+"_"+str(train_obs)+"/"
+
     # test data is the same for an experiment, thus we run it only once
-    y_test = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + "grid_test.csv").values,dtype=torch.float32)
-    test_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+str(copula)+"_3_2000/" + "test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    y_test = torch.tensor(pd.read_csv(data_folder + "grid_test.csv").values,dtype=torch.float32)
+    test_log_likelihood = torch.tensor(pd.read_csv(data_folder + "test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     fig_y_test = plot_densities(y_test)
+
+    if covariate_exists == True:
+        x_test = torch.tensor(pd.read_csv(data_folder + "test_covariate.csv").values,dtype=torch.float32)
+        x_test = x_test.squeeze()
+        number_covariates = 1
+    else:
+        x_test = False
+        number_covariates = 0
 
     # Starting the MLflow run
     mlflow.start_run(
@@ -54,11 +67,21 @@ def run_simulation_study(
     set_seeds(seed_value)
 
     # Getting the training data
-    experiment_folder = str(copula)+"_"+str(copula_par)+"_"+str(train_obs)+"/"
-    y_train = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_sample_train.csv").values,dtype=torch.float32)
-    y_validate = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_sample_validate.csv").values,dtype=torch.float32)
-    train_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    y_train = torch.tensor(pd.read_csv(data_folder+str(seed_value)+"_sample_train.csv").values,dtype=torch.float32)
+    y_validate = torch.tensor(pd.read_csv(data_folder+str(seed_value)+"_sample_validate.csv").values,dtype=torch.float32)
+    train_log_likelihood = torch.tensor(pd.read_csv(data_folder+str(seed_value)+"_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     #validate_log_likelihood = torch.tensor(pd.read_csv("simulation_study_data/"+experiment_folder+str(seed_value)+"_validate_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+
+    if covariate_exists == True:
+        x_train = torch.tensor(pd.read_csv(data_folder+str(seed_value)+"_train_covariate.csv").values,dtype=torch.float32)
+        x_validate = torch.tensor(pd.read_csv(data_folder+str(seed_value)+"_validate_covariate.csv").values,dtype=torch.float32)
+        x_train = x_train.squeeze()
+        x_validate = x_validate.squeeze()
+        # TODO: exchange covariate_exists to number_covariates to not have two variables
+        # maybe even include in variable copula_par
+    else:
+        x_train = False
+        x_validate = False
 
     if hyperparameter_tuning:
 
@@ -68,13 +91,16 @@ def run_simulation_study(
                                             poly_span_abs, iterations_hyperparameter_tuning, spline_decorrelation,
                                         penvalueridge_list, penfirstridge_list, pensecondridge_list,
                                         learning_rate_list, patience_list, min_delta_list,
-                                        degree_transformations_list, degree_decorrelation_list) #normalisation_layer_list
+                                        degree_transformations_list, degree_decorrelation_list,
+                                            x_train = x_train,
+                                            x_validate = x_validate) #normalisation_layer_list
 
         fig_hyperparameter_tuning_cooordinate = optuna.visualization.plot_parallel_coordinate(results)
         fig_hyperparameter_tuning_contour = optuna.visualization.plot_contour(results)
         fig_hyperparameter_tuning_slice = optuna.visualization.plot_slice(results)
         fig_hyperparameter_tuning_plot_param_importances = optuna.visualization.plot_param_importances(results)
         fig_hyperparameter_tuning_edf = optuna.visualization.plot_edf(results)
+        #TODO: store the hyperparameter tuning figures as artifacts
 
         #mlflow.log_figure(fig_hyperparameter_tuning_cooordinate, "fig_hyperparameter_tuning_cooordinate.html")
         #mlflow.log_figure(fig_hyperparameter_tuning_contour, "fig_hyperparameter_tuning_cooordinate.html")
@@ -132,6 +158,7 @@ def run_simulation_study(
     mlflow.log_param(key="degree_decorrelation", value=degree_decorrelation)
     mlflow.log_param(key="spline_inverse", value=spline_inverse)
     mlflow.log_param(key="iterations_hyperparameter_tuning", value=iterations_hyperparameter_tuning)
+    mlflow.log_param(key="covariate_exists", value=covariate_exists)
     #mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
 
     # Defining the model
@@ -151,13 +178,15 @@ def run_simulation_study(
                       degree_transformations=int(degree_transformations),
                       degree_decorrelation=int(degree_decorrelation),
                       span_factor = span_factor,
-                      span_restriction = span_restriction)
+                      span_restriction = span_restriction,
+                      number_covariates=number_covariates)
                       #normalisation_layer=normalisation_layer)
 
     # Training the model
     loss_training_iterations, number_iterations, pen_value_ridge_final, pen_first_ridge_final, pen_second_ridge_final,\
     training_time, fig_training = train(model=nf_mctm,
                                      train_data=y_train,
+                                     train_covariates=x_train,
                                      penalty_params=penalty_params,
                                      iterations=iterations,
                                      learning_rate=learning_rate,
@@ -167,6 +196,7 @@ def run_simulation_study(
 
     # Training the inverse of the model
     fig_training_inverse = nf_mctm.l1.approximate_inverse(input=y_train,
+                                                          input_covariate=x_train,
                                                           spline_inverse=spline_inverse,
                                                           degree_inverse=degree_inverse,
                                                           monotonically_increasing_inverse=monotonically_increasing_inverse,
@@ -177,21 +207,21 @@ def run_simulation_study(
 
     #### Training Evaluation
 
-    sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
+    sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
 
     fig_y_train = plot_densities(y_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
-    fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1,y_train=y_train)
-    fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2)
-    fig_splines_decorrelation_layer_4 = plot_splines(layer= nf_mctm.l4)
-    fig_splines_decorrelation_layer_6 = plot_splines(layer= nf_mctm.l6)
+    fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1, y_train=y_train, covariate_exists=covariate_exists)
+    fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2, covariate_exists=covariate_exists)
+    fig_splines_decorrelation_layer_4 = plot_splines(layer= nf_mctm.l4, covariate_exists=covariate_exists)
+    fig_splines_decorrelation_layer_6 = plot_splines(layer= nf_mctm.l6, covariate_exists=covariate_exists)
 
     # Evaluate latent space of the model in training set
-    z_train = nf_mctm.forward(y_train, train=False).detach().numpy()
+    z_train = nf_mctm.latent_space_representation(y_train, x_train).detach().numpy()
     res_normal_train, res_pval_train, z_mean_train, z_cov_train, p_train = evaluate_latent_space(z_train)
-    fig_z_train = plot_densities(z_train)
+    fig_z_train = plot_densities(z_train, x_train)
 
-    predicted_train_log_likelihood = nf_mctm.log_likelihood(y_train)
+    predicted_train_log_likelihood = nf_mctm.log_likelihood(y_train, x_train)
     kl_divergence_nf_mctm_train_vec = kl_divergence(target_log_likelihood=train_log_likelihood,
                                                 predicted_log_likelihood=predicted_train_log_likelihood,
                                                 mean=False)
@@ -199,7 +229,7 @@ def run_simulation_study(
     fig_kl_divergence_nf_mctm_train = plot_kl_divergence_scatter(y_train, kl_divergence_nf_mctm_train_vec)
 
     # estimate true model on training data
-    train_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+ experiment_folder + str(seed_value) + "_est_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    train_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv(data_folder + str(seed_value) + "_est_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     kl_divergence_true_model_train_vec = kl_divergence(target_log_likelihood=train_log_likelihood,
                                                    predicted_log_likelihood=train_log_likelihood_estimated_true_model,
                                                    mean=False)
@@ -220,11 +250,11 @@ def run_simulation_study(
 
     #### Test Evaluation
     # Evaluate latent space of the model in test set
-    z_test = nf_mctm.forward(y_test, train=False).detach().numpy()
+    z_test = nf_mctm.latent_space_representation(y_test, x_test).detach().numpy()
     res_normal_test, res_pval_test, z_mean_test, z_cov_test, p_test = evaluate_latent_space(z_test)
     fig_z_test = plot_densities(z_test)
 
-    predicted_test_log_likelihood = nf_mctm.log_likelihood(y_test)
+    predicted_test_log_likelihood = nf_mctm.log_likelihood(y_test, x_test)
     kl_divergence_nf_mctm_test_vec = kl_divergence(target_log_likelihood=test_log_likelihood,
                                                 predicted_log_likelihood=predicted_test_log_likelihood,
                                                 mean=False)
@@ -232,7 +262,7 @@ def run_simulation_study(
     fig_kl_divergence_nf_mctm_test = plot_kl_divergence_scatter(y_test, kl_divergence_nf_mctm_test_vec)
 
     # estimated true model on test data
-    test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv("simulation_study_data/"+ experiment_folder + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
+    test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv(data_folder + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
     kl_divergence_true_model_test_vec = kl_divergence(target_log_likelihood=test_log_likelihood,
                                                    predicted_log_likelihood=test_log_likelihood_estimated_true_model,
                                                    mean=False)
@@ -248,7 +278,12 @@ def run_simulation_study(
     fig_kl_divergence_mvn_model_test = plot_kl_divergence_scatter(y_test, kl_divergence_mvn_model_test_vec)
 
     #### Generate a sample from the trained model
-    y_sampled = nf_mctm.sample(n_samples=n_samples)
+    # TODO: discuss this, I sample from model with x_train as values (sensible buy maybe moroe specific values better?)
+    if x_train is not False:
+        x_sample = x_train[x_train.multinomial(num_samples=n_samples, replacement=True)]
+    else:
+        x_sample = False
+    y_sampled = nf_mctm.sample(n_samples=n_samples, covariate=x_sample)
     y_sampled = y_sampled.detach().numpy()
     fig_y_sampled = plot_densities(y_sampled,
                                    x_lim=[y_train.min(), y_train.max()],
@@ -374,32 +409,33 @@ if __name__ == '__main__':
 
     run_simulation_study(
         experiment_id = 2,
-        copula = "t",
-        copula_par = 3,
+        copula = "joe",
+        copula_par = "3",
         train_obs = 2000,
+        covariate_exists = False,
         # Setting Hyperparameter Values
         seed_value=1,
         penvalueridge_list=[0],
         penfirstridge_list=[0],
-        pensecondridge_list=[1],
+        pensecondridge_list=[0],
         poly_span_abs=15,
         spline_decorrelation="bspline",
         spline_inverse="bernstein",
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=10,
-        iterations_hyperparameter_tuning=5000,
-        iterations_inverse=1,
+        iterations=100,
+        iterations_hyperparameter_tuning=100,
+        iterations_inverse=5,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
         degree_transformations_list=[15],
-        degree_decorrelation_list=[40],
+        degree_decorrelation_list=[20],
         #normalisation_layer_list=[None],
         degree_inverse=40,
         monotonically_increasing_inverse=True,
-        hyperparameter_tuning=False,
+        hyperparameter_tuning=True,
         n_samples=2000)
     #TODO: stop the plots all from showing plots
 

@@ -10,8 +10,8 @@ from tqdm import tqdm
 import seaborn as sns
 from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
 
-def objective(y, model, penalty_params, avg = True):
-    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, train=True)
+def objective(y, model, penalty_params, train_covariates=False, avg = True):
+    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, covariate=train_covariates, train=True)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())
@@ -81,14 +81,14 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
+def optimize(y, model, objective, penalty_params, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
     opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
         opt.zero_grad()
         loss, pen_value_ridge, \
-        pen_first_ridge, pen_second_ridge  = objective(y, model, penalty_params) # use the `objective` function
+        pen_first_ridge, pen_second_ridge  = objective(y, model, penalty_params, train_covariates=train_covariates) # use the `objective` function
         #loss.backward() # backpropagate the loss
         return loss
 
@@ -116,15 +116,15 @@ def optimize(y, model, objective, penalty_params, learning_rate=1, iterations = 
     model.load_state_dict(early_stopper.best_model_state)
 
     # Rerun model at the end to get final penalties
-    _, pen_value_ridge, pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params)
+    _, pen_value_ridge, pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params, train_covariates=train_covariates)
 
     return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge
 
-def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
+def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
 
     if return_report:
         start = time.time()
-        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
         end = time.time()
 
         training_time = end - start
@@ -138,7 +138,7 @@ def train(model, train_data, penalty_params=torch.FloatTensor([0,0,0]), learning
         return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, training_time, fig
 
     else:
-        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
 
 #TODO: Outdated function when we merely tested with Laplace example from probML lecture

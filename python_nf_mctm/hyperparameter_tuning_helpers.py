@@ -20,7 +20,9 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           patience_list: list,
                           min_delta_list: list,
                           degree_transformations_list: list,
-                          degree_decorrelation_list: list):
+                          degree_decorrelation_list: list,
+                          x_train: torch.Tensor = False,
+                          x_validate: torch.Tensor = False):
                           #normalisation_layer_list: list):
     """
     Generates List of all combinations of hyperparameter values from lists
@@ -66,17 +68,24 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
         #    y_train = y[train_idx, :]
         #    y_validate = y[val_idx, :]
 
+        if x_train is False:
+            number_covariates = 0
+        else:
+            number_covariates = x_train.size()[1]
+
         nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
                           input_max=y_train.max(0).values,
                           polynomial_range=poly_range,
                           number_variables=y_train.size()[1],
                           spline_decorrelation=spline_decorrelation,
                           degree_transformations=degree_transformations,
-                          degree_decorrelation=degree_decorrelation)
+                          degree_decorrelation=degree_decorrelation,
+                          number_covariates=number_covariates)
         # normalisation_layer=normalisation_layer)
 
         train(model=nf_mctm,
               train_data=y_train,
+              train_covariates=x_train,
               penalty_params=penalty_params,
               iterations=iterations,
               learning_rate=learning_rate,
@@ -85,7 +94,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
               verbose=False,
               return_report=False)  # no need for reporting and metrics,plots etc.
 
-        return nf_mctm.log_likelihood(y_validate).detach().numpy().sum()
+        return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
 
 
     study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,

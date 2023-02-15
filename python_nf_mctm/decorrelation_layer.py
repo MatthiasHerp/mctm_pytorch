@@ -47,7 +47,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                           span_factor=span_factor,
                                                           span_restriction=span_restriction,
                                                           covariate=covariate,
-                                                          params_covariate=params_covariate)
+                                                          params_covariate=params_covariate[:,covar_num])
 
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
@@ -58,7 +58,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         derivativ=0,
                                                         span_factor=span_factor,
                                                         covariate=covariate,
-                                                        params_covariate=params_covariate)
+                                                        params_covariate=params_covariate[:,covar_num])
                                                         #return_penalties not implemented yet
             else:
                 #input into spline
@@ -74,7 +74,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       span_factor=span_factor,
                                                       span_restriction=span_restriction,
                                                       covariate=covariate,
-                                                      params_covariate=params_covariate)
+                                                      params_covariate=params_covariate[:,covar_num])
                     second_order_ridge_pen_sum += second_order_ridge_pen_current
                     first_order_ridge_pen_sum += first_order_ridge_pen_current
                     param_ridge_pen_sum += param_ridge_pen_current
@@ -89,7 +89,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         derivativ=0,
                                                         span_factor=span_factor,
                                                         covariate=covariate,
-                                                        params_covariate=params_covariate)
+                                                        params_covariate=params_covariate[:,covar_num])
                     second_order_ridge_pen_sum += second_order_ridge_pen_current
                     first_order_ridge_pen_sum += first_order_ridge_pen_current
                     param_ridge_pen_sum += param_ridge_pen_current
