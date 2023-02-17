@@ -97,40 +97,57 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
 
     num_cols = data.shape[1]
     num_combinations = int(num_cols * (num_cols - 1) / 2)
+    if covariate is False:
+        numbers_covariates = 1
+    else:
+
+        covariate = torch.round(covariate/0.2)*0.2
+        numbers_covariates = torch.unique(covariate).size(0)
+        covariate_values = torch.unique(covariate)
 
     if num_combinations > 1 :
-        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15,5),
-                                gridspec_kw={'wspace':0.0, 'hspace':0.0},sharey=True)
+        fig, axs = plt.subplots(nrows=numbers_covariates, ncols=num_combinations, figsize=(15,5),
+                                gridspec_kw={'wspace':0.01, 'hspace':0.0})
         a=0
         for i, j in combinations(range(num_cols), 2):
             if i != j:
                 if covariate is False:
                     sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[a])
+                    sns.kdeplot(x=data[:, j], y=data[:, i], fill=True, alpha=0.9, ax=axs[a])
                 else:
-                    sns.scatterplot(x=data[:, j], y=data[:, i], hue=covariate, alpha=0.6, color="k", ax=axs[a])
-                sns.kdeplot(x=data[:,j], y=data[:,i], fill=True, alpha=0.9, ax=axs[a])
+                    for c in range(numbers_covariates):
+                        sub_data = data[covariate == covariate_values[c]]
+                        sub_covariate = covariate[covariate == covariate_values[c]]
+                        sns.scatterplot(x=sub_data[:, j], y=sub_data[:, i], hue=sub_covariate, alpha=0.6, color="k", ax=axs[c,a])
+                        sns.kdeplot(x=sub_data[:,j], y=sub_data[:,i], fill=True, alpha=0.9, ax=axs[c,a])
 
-                axs[a].set_xlim(x_lim)
-                axs[a].set_ylim(y_lim)
+                axs[c,a].set_xlim(x_lim)
+                axs[c,a].set_ylim(y_lim)
 
                 a += 1
 
         plt.subplots_adjust(wspace=0.05)
     else:
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig, ax = plt.subplots(nrows=numbers_covariates, figsize=(6, 6*numbers_covariates))
         if covariate is False:
             sns.scatterplot(x=data[:,0], y=data[:,1], alpha=0.6, color="k", ax=ax)
+            sns.kdeplot(x=data[:, 0], y=data[:, 1], fill=True, alpha=0.9, ax=ax)
         else:
-            sns.scatterplot(x=data[:,0], y=data[:,1], hue=covariate, alpha=0.6, color="k", ax=ax)
-        sns.kdeplot(x=data[:,0], y=data[:,1], fill=True, alpha=0.9, ax = ax)
-        if x_lim is not None:
-            ax.set_xlim(x_lim)
-        if y_lim is not None:
-            ax.set_ylim(y_lim)
+            for c in range(numbers_covariates):
+                sub_data = data[covariate == covariate_values[c]]
+                sub_covariate = covariate[covariate == covariate_values[c]]
+                sns.scatterplot(x=sub_data[:, 0], y=sub_data[:, 1], hue=sub_covariate, alpha=0.6, color="k",
+                                ax=ax[c])
+                sns.kdeplot(x=sub_data[:, 0], y=sub_data[:, 1], fill=True, alpha=0.9, ax=ax[c,])
+        #if x_lim is not None:
+        #    ax.set_xlim(x_lim)
+        #if y_lim is not None:
+        #    ax.set_ylim(y_lim)
 
     return fig
 
-def plot_kl_divergence_scatter(data,kl_divergence,covariate=False,x_lim=None,y_lim=None):
+#kl_divergence_scatter
+def plot_metric_scatter(data, metric, covariate=False, x_lim=None, y_lim=None, metric_type="kl_divergence"):
     # Ensures that by default all points are in the plot and axis have the same span (not distortion, can see distribution clearly)
     if x_lim is None:
         x_lim = [data.min(), data.max()]
@@ -139,34 +156,41 @@ def plot_kl_divergence_scatter(data,kl_divergence,covariate=False,x_lim=None,y_l
 
     if torch.is_tensor(data):
         data = data.detach().numpy()
-    if torch.is_tensor(kl_divergence):
-        kl_divergence = kl_divergence.detach().numpy()
+    if torch.is_tensor(metric):
+        metric = metric.detach().numpy()
 
     num_cols = data.shape[1]
     num_combinations = int(num_cols * (num_cols - 1) / 2)
 
     if num_combinations > 1:
         fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15, 5),
-                                gridspec_kw={'wspace': 0.0, 'hspace': 0.0}, sharey=True)
+                                gridspec_kw={'wspace': 0.01, 'hspace': 0.0})
         a = 0
         for i, j in combinations(range(num_cols), 2):
             if i != j:
                 if covariate is not False:
                     warnings.warn("Covariate is not supported for 3d data yet")
 
+                max_deviance = np.max(abs(metric))  # ensures that the colorbar is centered
+                norm = plt.Normalize(-max_deviance, max_deviance)
+
                 # palette from here:
                 # https: // seaborn.pydata.org / tutorial / color_palettes.html
-                sns.scatterplot(x=data[:, i], y=data[:, j], hue=kl_divergence, ax=axs[a], palette='icefire')
+                if metric_type == "kl_divergence":
+                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric, ax=axs[a], palette='icefire')
+                elif metric_type == "precision_matrix":
+                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric[:,i,j], hue_norm=norm, ax=axs[a], palette='icefire')
 
                 # Create a scalar mappable to show the legend
                 # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
-                max_deviance = max(abs(kl_divergence))  # ensures that the colorbar is centered
-                norm = plt.Normalize(-max_deviance, max_deviance)
                 sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
                 sm.set_array([])
 
                 axs[a].set_xlim(x_lim)
                 axs[a].set_ylim(y_lim)
+
+                axs[a].set_xlabel("y_" + str(i))
+                axs[a].set_ylabel("y_" + str(j))
 
                 # Remove the legend and add a colorbar
                 axs[a].get_legend().remove()
@@ -179,20 +203,63 @@ def plot_kl_divergence_scatter(data,kl_divergence,covariate=False,x_lim=None,y_l
         fig, ax = plt.subplots(figsize=(6, 6))
         # palette from here:
         #https: // seaborn.pydata.org / tutorial / color_palettes.html
-        sns.scatterplot(x=data[:,0], y=data[:,1], hue=kl_divergence, ax = ax, palette='icefire')
+        if metric_type == "kl_divergence":
+            sns.scatterplot(x=data[:,0], y=data[:,1], hue=metric, ax = ax, palette='icefire')
+        elif metric_type == "precision_matrix":
+            sns.scatterplot(x=data[:, 0], y=data[:, 1], hue=metric[:, 0, 1], ax=ax, palette='icefire')
 
         # Create a scalar mappable to show the legend
         # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
-        max_deviance = max(abs(kl_divergence)) # ensures that the colorbar is centered
+        max_deviance = np.max(abs(metric)) # ensures that the colorbar is centered
         norm = plt.Normalize(-max_deviance, max_deviance)
         sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
         sm.set_array([])
+
+        ax.set_xlabel("y_" + str(0))
+        ax.set_ylabel("y_" + str(1))
 
         # Remove the legend and add a colorbar
         ax.get_legend().remove()
         ax.figure.colorbar(sm)
 
     return fig
+
+def plot_metric_hist(metric, covariate=False):
+
+    if torch.is_tensor(metric):
+        metric = metric.detach().numpy()
+
+    num_cols = metric.shape[1]
+    num_combinations = int(num_cols * (num_cols - 1) / 2)
+
+    if num_combinations > 1:
+        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15, 5),
+                                gridspec_kw={'wspace': 0.01, 'hspace': 0.0})
+        a = 0
+        for i, j in combinations(range(num_cols), 2):
+            if i != j:
+                if covariate is not False:
+                    warnings.warn("Covariate is not supported for 3d data yet")
+
+                # palette from here:
+                # https: // seaborn.pydata.org / tutorial / color_palettes.html
+                sns.histplot(x=metric[:,i,j], ax=axs[a])
+
+                axs[a].set_xlabel("y_" + str(i))
+                axs[a].set_ylabel("y_" + str(j))
+
+                a += 1
+    else:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        # palette from here:
+        #https: // seaborn.pydata.org / tutorial / color_palettes.html
+        sns.histplot(x=metric[:,0,1], ax=ax)
+
+        ax.set_xlabel("y_" + str(0))
+        ax.set_ylabel("y_" + str(1))
+
+    return fig
+
 
 def plot_splines(layer, y_train=None, covariate_exists=False):
 
@@ -283,7 +350,7 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
 
     if num_splines > 1 :
         fig, axs = plt.subplots(nrows=1, ncols=num_splines, figsize=(15,5),
-                                gridspec_kw={'wspace':0.0, 'hspace':0.0},sharey=True)
+                                gridspec_kw={'wspace':0.01, 'hspace':0.0},sharey=False, sharex=False)#dont want to share all x (sharex) and y axis (sharey)
         a=0
         for spline_num in range(num_splines):
             subset_results = results[results["spline_num"]==spline_num]
@@ -299,9 +366,17 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
                     sns.lineplot(x="y", y="z_tilde_derivativ", data=subset_results, ax=axs[a])
                     sns.lineplot(x="y_estimated", y="z_tilde", linestyle='--', data=subset_results,
                                  ax=axs[a])
-
+            #TODO: solve this issue, somehow the min() max() in the comment below does not span all possible values
+            #if layer.type == "transformation":
+            #    axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
+            #elif layer.type == "decorrelation":
+            #    axs[a].set_ylim(-2, 2)
             axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
             axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
+
+            axs[a].set_xlabel("z_tilde")
+            axs[a].set_ylabel("lambda_" + str(spline_num))
+
             a+=1
 
         plt.subplots_adjust(wspace=0.05)
@@ -314,6 +389,9 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
             sns.lineplot(x="y", y="z_tilde", data=results, ax = ax)
         ax.set_ylim(results["z_tilde"].min(), results["z_tilde"].max())
         ax.set_xlim(results["y"].min(), results["y"].max())
+
+        ax.set_xlabel("z_tilde")
+        ax.set_ylabel("lambda_" + str(0))
 
 
     return fig

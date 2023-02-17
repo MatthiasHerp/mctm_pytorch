@@ -16,7 +16,7 @@ def rewrite_artifact_path(metadata_file, pwd, artifact_path_key):
         y[artifact_path_key] = f"file://{pwd}"
 
     with open(metadata_file, "w") as f:
-        print(yaml.dump(y, default_flow_style=False, sort_keys=False))
+        #print(yaml.dump(y, default_flow_style=False, sort_keys=False))
         yaml.dump(y, f, default_flow_style=False, sort_keys=False)
 
 
@@ -31,11 +31,11 @@ if __name__ == "__main__":
     absolute_path = "/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlruns"
     absolute_path = Path(absolute_path).resolve()
 
-    print(absolute_path)
+    #print(absolute_path)
     for experiment_folder in absolute_path.iterdir():
 
         if ".DS_Store" not in str(experiment_folder):
-            print(experiment_folder)
+            #print(experiment_folder)
 
             metadata_file = experiment_folder / "meta.yaml"
 
@@ -44,8 +44,10 @@ if __name__ == "__main__":
                 rewrite_artifact_path(metadata_file, experiment_folder, artifact_path_key='artifact_location')
             for run_folder in experiment_folder.iterdir():
                 metadata_file = run_folder / "meta.yaml"
-                print(run_folder)
+                #print(run_folder)
 
                 # Fix run metadata
                 if metadata_file.exists():
                     rewrite_artifact_path(metadata_file, run_folder / "artifacts", artifact_path_key='artifact_uri')
+
+    print("Done!")

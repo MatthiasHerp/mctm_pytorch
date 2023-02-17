@@ -23,7 +23,8 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           degree_transformations_list: list,
                           degree_decorrelation_list: list,
                           x_train: torch.Tensor = False,
-                          x_validate: torch.Tensor = False):
+                          x_validate: torch.Tensor = False,
+                          tuning_mode="optuna"):
                           #normalisation_layer_list: list):
     """
     Generates List of all combinations of hyperparameter values from lists
@@ -52,64 +53,68 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                      #normalisation_layer_list]
     #TODO: also allow for grid search, required for the lasso
     hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
-    penvalueridge, penfirstridge, pensecondridge, lambda_penalty_params, learning_rate, \
-    patience, min_delta, degree_transformations, degree_decorrelation  = hyperparameter_combinations_list[0]
 
-    def optuna_objective(trial):
-        # Defining the model
-        poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
+    if tuning_mode == "optuna":
+        penvalueridge, penfirstridge, pensecondridge, lambda_penalty_params, learning_rate, \
+        patience, min_delta, degree_transformations, degree_decorrelation  = hyperparameter_combinations_list[0]
 
-        #penvalueridge_opt  = trial.suggest_float("penvalueridge", 0.001, 5, log=True),
-        penvalueridge_opt = 0
-        penfirstridge_opt  = trial.suggest_float("penfirstridge", 0.001, 10, log=True)
-        pensecondridge_opt = trial.suggest_float("pensecondridge", 0.001, 20, log=True)
-        penalty_params = torch.tensor([penvalueridge_opt,
-                                       penfirstridge_opt,
-                                       pensecondridge_opt])
+        def optuna_objective(trial):
+            # Defining the model
+            poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
 
-        # for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
-        #    y_train = y[train_idx, :]
-        #    y_validate = y[val_idx, :]
+            #penvalueridge_opt  = trial.suggest_float("penvalueridge", 0.001, 5, log=True),
+            penvalueridge_opt = 0
+            penfirstridge_opt  = trial.suggest_float("penfirstridge", 0.001, 10, log=True)
+            pensecondridge_opt = trial.suggest_float("pensecondridge", 0.001, 20, log=True)
+            penalty_params = torch.tensor([penvalueridge_opt,
+                                           penfirstridge_opt,
+                                           pensecondridge_opt])
 
-        if x_train is False:
-            number_covariates = 0
-        else:
-            number_covariates = 1
+            # for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
+            #    y_train = y[train_idx, :]
+            #    y_validate = y[val_idx, :]
 
-        nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
-                          input_max=y_train.max(0).values,
-                          polynomial_range=poly_range,
-                          number_variables=y_train.size()[1],
-                          spline_decorrelation=spline_decorrelation,
-                          degree_transformations=degree_transformations,
-                          degree_decorrelation=degree_decorrelation,
-                          number_covariates=number_covariates)
-        # normalisation_layer=normalisation_layer)
+            if x_train is False:
+                number_covariates = 0
+            else:
+                number_covariates = 1
 
-        train(model=nf_mctm,
-              train_data=y_train,
-              train_covariates=x_train,
-              penalty_params=penalty_params,
-              lambda_penalty_params=lambda_penalty_params,
-              iterations=iterations,
-              learning_rate=learning_rate,
-              patience=patience,
-              min_delta=min_delta,
-              verbose=False,
-              return_report=False)  # no need for reporting and metrics,plots etc.
+            nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
+                              input_max=y_train.max(0).values,
+                              polynomial_range=poly_range,
+                              number_variables=y_train.size()[1],
+                              spline_decorrelation=spline_decorrelation,
+                              degree_transformations=degree_transformations,
+                              degree_decorrelation=degree_decorrelation,
+                              number_covariates=number_covariates)
+            # normalisation_layer=normalisation_layer)
 
-        return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
+            train(model=nf_mctm,
+                  train_data=y_train,
+                  train_covariates=x_train,
+                  penalty_params=penalty_params,
+                  lambda_penalty_params=lambda_penalty_params,
+                  iterations=iterations,
+                  learning_rate=learning_rate,
+                  patience=patience,
+                  min_delta=min_delta,
+                  verbose=False,
+                  return_report=False)  # no need for reporting and metrics,plots etc.
 
-    # docs: https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html#optuna.samplers.TPESampler
-    study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
-                                                   consider_prior=True, # is this useful without a prior weight?
-                                                   prior_weight=0, #default value 1.0 but then does not explore the space as good I think
-                                                   multivariate=True # experimental but very useful here as our parameters are highly correlated
-                                                   ),
-                                direction='maximize')
-    study.optimize(optuna_objective, n_trials=15)
+            return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
 
-    print("hyperparameter_tuning done")
+        # docs: https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html#optuna.samplers.TPESampler
+        study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
+                                                       consider_prior=True, # is this useful without a prior weight?
+                                                       prior_weight=0, #default value 1.0 but then does not explore the space as good I think
+                                                       multivariate=True # experimental but very useful here as our parameters are highly correlated
+                                                       ),
+                                    direction='maximize')
+        study.optimize(optuna_objective, n_trials=15)
+
+        print("hyperparameter_tuning done")
+
+    #elif tuning_mode == "grid":
     #list_of_lists = [penvalueridge_list, penfirstridge_list, pensecondridge_list,
     #                 learning_rate_list,
     #                 patience_list, min_delta_list,

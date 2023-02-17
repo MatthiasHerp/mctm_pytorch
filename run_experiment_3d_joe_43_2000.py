@@ -4,20 +4,20 @@ import torch
 
 if __name__ == "__main__":
 
-    #mlflow.create_experiment(name="t_3_2000")
-    experiment = mlflow.get_experiment_by_name("t_3_2000")
+    #mlflow.create_experiment(name="3d_joe_43_2000")#, artifact_location="/Users/maherp/Desktop/Universitaet/Goettingen/5_Semester/master_thesis/mctm_pytorch/mlflow_storage/test_sim_study/")
+    experiment = mlflow.get_experiment_by_name("3d_joe_43_2000")
 
-    #source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
-    #torch.set_num_interop_threads(50)  # Inter-op parallelism
-    #torch.set_num_threads(50)  # Intra-op parallelism
+    # source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
+    torch.set_num_interop_threads(50)  # Inter-op parallelism
+    torch.set_num_threads(50)  # Intra-op parallelism
 
-    for seed_num in range(11,21):
+    for seed_num in range(1,11):
 
         run_simulation_study(
                 experiment_id = experiment.experiment_id,
-                copula = "t",
-                copula_par = 3,
+                copula = "3d_joe",
                 covariate_exists=False,
+                copula_par = 43,
                 train_obs = 2000,
                 # Setting Hyperparameter Values
                 seed_value=seed_num,
@@ -32,12 +32,13 @@ if __name__ == "__main__":
                 span_restriction="reluler",
                 iterations=10000,
                 iterations_hyperparameter_tuning=5000,
-                iterations_inverse=5000,
+                iterations_inverse=10000,
                 learning_rate_list=[1.],
                 patience_list=[10],
                 min_delta_list=[1e-8],
                 degree_transformations_list=[15],
                 degree_decorrelation_list=[40],
+                lambda_penalty_params_list=[False],
                 #normalisation_layer_list=[None],
                 degree_inverse=40,
                 monotonically_increasing_inverse=True,

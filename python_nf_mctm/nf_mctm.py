@@ -93,7 +93,7 @@ class NF_MCTM(nn.Module):
             first_order_ridge_pen_global += first_order_ridge_pen_sum
             param_ridge_pen_global += param_ridge_pen_sum
 
-            lambda_matrix_global = torch.matmul(lambda_matrix_global, self.l5(lambda_matrix))
+            lambda_matrix_global = torch.matmul(lambda_matrix_global, lambda_matrix)
 
             return output, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global, lambda_matrix_global
 
@@ -124,6 +124,18 @@ class NF_MCTM(nn.Module):
             log_likelihood = log_likelihood_latent + log_d #now a minus here
             vec_log_likelihood = log_likelihood.sum(1)
         return vec_log_likelihood
+
+    def compute_precision_matrix(self, y, covariate=False):
+
+        with torch.no_grad():
+            z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, \
+            param_ridge_pen_global, lambda_matrix_global = self.forward(y, covariate=covariate, evaluate=True, train=False)
+
+            # Compute the precision matrix
+            precision_matrix = torch.matmul(torch.transpose(lambda_matrix_global, 1, 2), lambda_matrix_global)
+
+        return precision_matrix
+
 
     def sample(self, n_samples, covariate=False):
         z = torch.distributions.Normal(0, 1).sample((n_samples, self.number_variables))

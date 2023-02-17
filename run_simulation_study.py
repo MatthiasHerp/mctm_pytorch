@@ -54,7 +54,6 @@ def run_simulation_study(
     # test data is the same for an experiment, thus we run it only once
     y_test = torch.tensor(pd.read_csv(data_folder + "grid_test.csv").values,dtype=torch.float32)
     test_log_likelihood = torch.tensor(pd.read_csv(data_folder + "test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
-    fig_y_test = plot_densities(y_test)
 
     if covariate_exists == True:
         x_test = torch.tensor(pd.read_csv(data_folder + "test_covariate.csv").values,dtype=torch.float32)
@@ -63,6 +62,8 @@ def run_simulation_study(
     else:
         x_test = False
         number_covariates = 0
+
+    fig_y_test = plot_densities(y_test, covariate=x_test)
 
     # Starting the MLflow run
     mlflow.start_run(
@@ -222,7 +223,7 @@ def run_simulation_study(
 
     sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
 
-    fig_y_train = plot_densities(y_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
+    fig_y_train = plot_densities(y_train, covariate=x_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
     fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1, y_train=y_train, covariate_exists=covariate_exists)
     fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2, covariate_exists=covariate_exists)
@@ -239,7 +240,11 @@ def run_simulation_study(
                                                 predicted_log_likelihood=predicted_train_log_likelihood,
                                                 mean=False)
     kl_divergence_nf_mctm_train = torch.mean(kl_divergence_nf_mctm_train_vec).item()
-    fig_kl_divergence_nf_mctm_train = plot_kl_divergence_scatter(y_train, kl_divergence_nf_mctm_train_vec)
+    fig_kl_divergence_nf_mctm_train = plot_metric_scatter(y_train, kl_divergence_nf_mctm_train_vec)
+
+    precision_matrix_train = nf_mctm.compute_precision_matrix(y_train, x_train)
+    fig_precision_matrix_nf_mctm_train = plot_metric_scatter(y_train, precision_matrix_train, metric_type="precision_matrix")
+    fig_hist_precision_matrix_nf_mctm_train = plot_metric_hist(precision_matrix_train, covariate=False)
 
     # estimate true model on training data
     train_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv(data_folder + str(seed_value) + "_est_train_log_likelihoods.csv").values,dtype=torch.float32).flatten()
@@ -247,7 +252,7 @@ def run_simulation_study(
                                                    predicted_log_likelihood=train_log_likelihood_estimated_true_model,
                                                    mean=False)
     kl_divergence_true_model_train = torch.mean(kl_divergence_true_model_train_vec).item()
-    fig_kl_divergence_true_model_train = plot_kl_divergence_scatter(y_train, kl_divergence_true_model_train_vec)
+    fig_kl_divergence_true_model_train = plot_metric_scatter(y_train, kl_divergence_true_model_train_vec)
 
     # estimate the Multivariate Normal Distribution as Model
     mean_mvn_model = y_train.mean(0) #0 to do mean across dim 0 not globally
@@ -259,7 +264,7 @@ def run_simulation_study(
                                                   predicted_log_likelihood=train_log_likelihood_mvn_model,
                                                   mean=False)
     kl_divergence_mvn_model_train = torch.mean(kl_divergence_mvn_model_train_vec).item()
-    fig_kl_divergence_mvn_model_train = plot_kl_divergence_scatter(y_train, kl_divergence_mvn_model_train_vec)
+    fig_kl_divergence_mvn_model_train = plot_metric_scatter(y_train, kl_divergence_mvn_model_train_vec)
 
     #### Test Evaluation
     # Evaluate latent space of the model in test set
@@ -272,7 +277,7 @@ def run_simulation_study(
                                                 predicted_log_likelihood=predicted_test_log_likelihood,
                                                 mean=False)
     kl_divergence_nf_mctm_test = torch.mean(kl_divergence_nf_mctm_test_vec).item()
-    fig_kl_divergence_nf_mctm_test = plot_kl_divergence_scatter(y_test, kl_divergence_nf_mctm_test_vec)
+    fig_kl_divergence_nf_mctm_test = plot_metric_scatter(y_test, kl_divergence_nf_mctm_test_vec)
 
     # estimated true model on test data
     test_log_likelihood_estimated_true_model = torch.tensor(pd.read_csv(data_folder + str(seed_value) + "_est_test_log_likelihoods.csv").values,dtype=torch.float32).flatten()
@@ -280,7 +285,7 @@ def run_simulation_study(
                                                    predicted_log_likelihood=test_log_likelihood_estimated_true_model,
                                                    mean=False)
     kl_divergence_true_model_test = torch.mean(kl_divergence_true_model_test_vec).item()
-    fig_kl_divergence_true_model_test = plot_kl_divergence_scatter(y_test, kl_divergence_true_model_test_vec)
+    fig_kl_divergence_true_model_test = plot_metric_scatter(y_test, kl_divergence_true_model_test_vec)
 
     # mvn Model on test data
     test_log_likelihood_mvn_model = mvn_model.log_prob(y_test)
@@ -288,7 +293,7 @@ def run_simulation_study(
                                                   predicted_log_likelihood=test_log_likelihood_mvn_model,
                                                   mean=False)
     kl_divergence_mvn_model_test = torch.mean(kl_divergence_mvn_model_test_vec).item()
-    fig_kl_divergence_mvn_model_test = plot_kl_divergence_scatter(y_test, kl_divergence_mvn_model_test_vec)
+    fig_kl_divergence_mvn_model_test = plot_metric_scatter(y_test, kl_divergence_mvn_model_test_vec)
 
     #### Generate a sample from the trained model
     # TODO: discuss this, I sample from model with x_train as values (sensible buy maybe moroe specific values better?)
@@ -299,8 +304,17 @@ def run_simulation_study(
     y_sampled = nf_mctm.sample(n_samples=n_samples, covariate=x_sample)
     y_sampled = y_sampled.detach().numpy()
     fig_y_sampled = plot_densities(y_sampled,
-                                   x_lim=[y_train.min(), y_train.max()],
-                                   y_lim=[y_train.min(), y_train.max()])
+                                   covariate=x_sample)#,
+                                   #x_lim=[y_train.min(), y_train.max()],
+                                   #y_lim=[y_train.min(), y_train.max()])
+
+    #if x_train is not False:
+    #    x_sample_0 = torch.tensor([0]).repeat(n_samples)
+    #    y_sampled_0 = nf_mctm.sample(n_samples=n_samples, covariate=x_sample_0)
+    #    y_sampled_0 = y_sampled.detach().numpy()
+    #    fig_y_sampled_0 = plot_densities(y_sampled_0,
+    #                                   x_lim=[y_train.min(), y_train.max()],
+    #                                   y_lim=[y_train.min(), y_train.max()])
 
     #### Log Training Artifacts
     model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
@@ -327,6 +341,9 @@ def run_simulation_study(
     log_mlflow_plot(fig_splines_decorrelation_layer_2,'plot_splines_decorrelation_layer_2.png')
     log_mlflow_plot(fig_splines_decorrelation_layer_4,'plot_splines_decorrelation_layer_4.png')
     log_mlflow_plot(fig_splines_decorrelation_layer_6,'plot_splines_decorrelation_layer_6.png')
+
+    log_mlflow_plot(fig_precision_matrix_nf_mctm_train,'plot_precision_matrix_nf_mctm_train.png')
+    log_mlflow_plot(fig_hist_precision_matrix_nf_mctm_train,'plot_hist_precision_matrix_nf_mctm_train.png')
 
     #fig_splines_transformation_layer_1.savefig('plot_splines_transformation_layer_1.png')
     #mlflow.log_artifact("./plot_splines_transformation_layer_1.png")
@@ -442,10 +459,10 @@ if __name__ == '__main__':
 
     run_simulation_study(
         experiment_id = 464499768340700910,
-        copula = "3d_joe",
-        copula_par = "3",
-        train_obs = 2000,
-        covariate_exists = False,
+        copula = "joe",
+        copula_par = "covariate",
+        train_obs = 5000,
+        covariate_exists = True,
         # Setting Hyperparameter Values
         seed_value=1,
         penvalueridge_list=[0],
@@ -457,19 +474,19 @@ if __name__ == '__main__':
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=2000,
+        iterations=1000,
         iterations_hyperparameter_tuning=5000,
-        iterations_inverse=1,
+        iterations_inverse=10,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
         degree_transformations_list=[15],
         degree_decorrelation_list=[40],
-        lambda_penalty_params_list=[False],#[torch.tensor([[0,1],[1,0]])],
+        lambda_penalty_params_list=[False], #[torch.tensor([[0,1,1],[1,0,1],[1,1,0]])],
         #normalisation_layer_list=[None],
         degree_inverse=40,
         monotonically_increasing_inverse=True,
         hyperparameter_tuning=False,
-        n_samples=2000)
+        n_samples=5000)
     #TODO: stop the plots all from showing plots
 

@@ -31,8 +31,9 @@ def objective(y, model, penalty_params, lambda_penalty_params: torch.Tensor =Fal
             warnings.warn("Warning: diagonal of lambda penalty matrix is not zero")
         if not (lambda_penalty_params.transpose(0, 1) == lambda_penalty_params).all():
             warnings.warn("Warning: lambda penalty matrix is not symmetric")
-        # Note: need here was we did not do that in the layers
-        pen_lambda_lasso = (lambda_penalty_params.unsqueeze(0) * torch.abs(lambda_matrix_global)).mean()
+        # Note: need compute precision matrix from lambda matrix and mean here was we did not do that in the layers
+        precision_matrix = torch.matmul(torch.transpose(lambda_matrix_global, 1, 2), lambda_matrix_global)
+        pen_lambda_lasso = (lambda_penalty_params.unsqueeze(0) * torch.abs(precision_matrix)).mean()
     else:
         pen_lambda_lasso = 0
 
