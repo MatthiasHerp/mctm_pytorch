@@ -16,6 +16,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           penvalueridge_list: list,
                           penfirstridge_list: list,
                           pensecondridge_list: list,
+                          lambda_penalty_params_list: list,
                           learning_rate_list: list,
                           patience_list: list,
                           min_delta_list: list,
@@ -44,12 +45,14 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
     """
 
     list_of_lists = [penvalueridge_list, penfirstridge_list, pensecondridge_list,
+                     lambda_penalty_params_list,
                      learning_rate_list,
                      patience_list, min_delta_list,
                      degree_transformations_list, degree_decorrelation_list]
                      #normalisation_layer_list]
+    #TODO: also allow for grid search, required for the lasso
     hyperparameter_combinations_list = list(itertools.product(*list_of_lists))
-    penvalueridge, penfirstridge, pensecondridge, learning_rate, \
+    penvalueridge, penfirstridge, pensecondridge, lambda_penalty_params, learning_rate, \
     patience, min_delta, degree_transformations, degree_decorrelation  = hyperparameter_combinations_list[0]
 
     def optuna_objective(trial):
@@ -71,7 +74,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
         if x_train is False:
             number_covariates = 0
         else:
-            number_covariates = x_train.size()[1]
+            number_covariates = 1
 
         nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
                           input_max=y_train.max(0).values,
@@ -87,6 +90,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
               train_data=y_train,
               train_covariates=x_train,
               penalty_params=penalty_params,
+              lambda_penalty_params=lambda_penalty_params,
               iterations=iterations,
               learning_rate=learning_rate,
               patience=patience,

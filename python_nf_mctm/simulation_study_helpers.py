@@ -3,6 +3,7 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 import numpy as np
 import pandas as pd
 import random
+import warnings
 from scipy import stats
 import time
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -108,10 +109,12 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
                 else:
                     sns.scatterplot(x=data[:, j], y=data[:, i], hue=covariate, alpha=0.6, color="k", ax=axs[a])
                 sns.kdeplot(x=data[:,j], y=data[:,i], fill=True, alpha=0.9, ax=axs[a])
-                a+=1
 
                 axs[a].set_xlim(x_lim)
                 axs[a].set_ylim(y_lim)
+
+                a += 1
+
         plt.subplots_adjust(wspace=0.05)
     else:
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -127,32 +130,70 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
 
     return fig
 
-def plot_kl_divergence_scatter(data,kl_divergence):
-    #TODO: This also needs to work for higher dimensional data e.g. 3d
+def plot_kl_divergence_scatter(data,kl_divergence,covariate=False,x_lim=None,y_lim=None):
+    # Ensures that by default all points are in the plot and axis have the same span (not distortion, can see distribution clearly)
+    if x_lim is None:
+        x_lim = [data.min(), data.max()]
+    if y_lim is None:
+        y_lim = [data.min(), data.max()]
+
     if torch.is_tensor(data):
         data = data.detach().numpy()
     if torch.is_tensor(kl_divergence):
         kl_divergence = kl_divergence.detach().numpy()
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-    # palette from here:
-    #https: // seaborn.pydata.org / tutorial / color_palettes.html
-    sns.scatterplot(x=data[:,0], y=data[:,1], hue=kl_divergence, ax = ax, palette='icefire')
+    num_cols = data.shape[1]
+    num_combinations = int(num_cols * (num_cols - 1) / 2)
 
-    # Create a scalar mappable to show the legend
-    # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
-    max_deviance = max(abs(kl_divergence)) # ensures that the colorbar is centered
-    norm = plt.Normalize(-max_deviance, max_deviance)
-    sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
-    sm.set_array([])
+    if num_combinations > 1:
+        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15, 5),
+                                gridspec_kw={'wspace': 0.0, 'hspace': 0.0}, sharey=True)
+        a = 0
+        for i, j in combinations(range(num_cols), 2):
+            if i != j:
+                if covariate is not False:
+                    warnings.warn("Covariate is not supported for 3d data yet")
 
-    # Remove the legend and add a colorbar
-    ax.get_legend().remove()
-    ax.figure.colorbar(sm)
+                # palette from here:
+                # https: // seaborn.pydata.org / tutorial / color_palettes.html
+                sns.scatterplot(x=data[:, i], y=data[:, j], hue=kl_divergence, ax=axs[a], palette='icefire')
+
+                # Create a scalar mappable to show the legend
+                # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
+                max_deviance = max(abs(kl_divergence))  # ensures that the colorbar is centered
+                norm = plt.Normalize(-max_deviance, max_deviance)
+                sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
+                sm.set_array([])
+
+                axs[a].set_xlim(x_lim)
+                axs[a].set_ylim(y_lim)
+
+                # Remove the legend and add a colorbar
+                axs[a].get_legend().remove()
+
+                a += 1
+
+        axs[num_combinations-1].figure.colorbar(sm)
+
+    else:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        # palette from here:
+        #https: // seaborn.pydata.org / tutorial / color_palettes.html
+        sns.scatterplot(x=data[:,0], y=data[:,1], hue=kl_divergence, ax = ax, palette='icefire')
+
+        # Create a scalar mappable to show the legend
+        # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
+        max_deviance = max(abs(kl_divergence)) # ensures that the colorbar is centered
+        norm = plt.Normalize(-max_deviance, max_deviance)
+        sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
+        sm.set_array([])
+
+        # Remove the legend and add a colorbar
+        ax.get_legend().remove()
+        ax.figure.colorbar(sm)
 
     return fig
 
-#TODO: plot needs to still work without a covariate
 def plot_splines(layer, y_train=None, covariate_exists=False):
 
     num_splines = layer.params.size()[1]

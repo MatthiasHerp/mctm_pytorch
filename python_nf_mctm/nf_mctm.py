@@ -68,27 +68,34 @@ class NF_MCTM(nn.Module):
             #output = self.l12(output)
 
             output, log_d, second_order_ridge_pen_global, \
-            first_order_ridge_pen_global, param_ridge_pen_global = self.l2(output, covariate, log_d, return_log_d = True, return_penalties=True)
+            first_order_ridge_pen_global, param_ridge_pen_global, \
+            lambda_matrix_global = self.l2(output, covariate, log_d, return_log_d = True, return_penalties=True)
 
             output = self.l3(output)
             #output = self.l34(output)
 
             output, log_d, second_order_ridge_pen_sum, \
-            first_order_ridge_pen_sum, param_ridge_pen_sum = self.l4(output, covariate, log_d, return_log_d = True, return_penalties=True)
+            first_order_ridge_pen_sum, param_ridge_pen_sum, lambda_matrix = self.l4(output, covariate, log_d, return_log_d = True, return_penalties=True)
+
+            second_order_ridge_pen_global += second_order_ridge_pen_sum
+            first_order_ridge_pen_global += first_order_ridge_pen_sum
+            param_ridge_pen_global += param_ridge_pen_sum
+
+            lambda_matrix_global = torch.matmul(lambda_matrix_global, self.l3(lambda_matrix))
 
             output = self.l5(output)
-            #output = self.l56(output)
-            second_order_ridge_pen_global += second_order_ridge_pen_sum
-            first_order_ridge_pen_global += first_order_ridge_pen_sum
-            param_ridge_pen_global += param_ridge_pen_sum
+            # output = self.l56(output)
 
             output, log_d, second_order_ridge_pen_sum, \
-            first_order_ridge_pen_sum, param_ridge_pen_sum = self.l6(output, covariate, log_d, return_log_d=True, return_penalties=True)
+            first_order_ridge_pen_sum, param_ridge_pen_sum, lambda_matrix = self.l6(output, covariate, log_d, return_log_d=True, return_penalties=True)
+
             second_order_ridge_pen_global += second_order_ridge_pen_sum
             first_order_ridge_pen_global += first_order_ridge_pen_sum
             param_ridge_pen_global += param_ridge_pen_sum
 
-            return output, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global
+            lambda_matrix_global = torch.matmul(lambda_matrix_global, self.l5(lambda_matrix))
+
+            return output, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global, lambda_matrix_global
 
         else:
             # new input true as we need to recompute the basis for the validation/test set
@@ -111,11 +118,11 @@ class NF_MCTM(nn.Module):
     def log_likelihood(self, y, covariate=False):
         #TODO: run this log_likelihood code and the sample code with torch.no_grad() to speed up the code
         # https://pytorch.org/docs/stable/generated/torch.no_grad.html#torch.no_grad
-        # with torch.no_grad():
-        z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = self.forward(y, covariate=covariate, evaluate=True, train=False)
-        log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
-        log_likelihood = log_likelihood_latent + log_d #now a minus here
-        vec_log_likelihood = log_likelihood.sum(1)
+        with torch.no_grad():
+            z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global, lambda_matrix_global = self.forward(y, covariate=covariate, evaluate=True, train=False)
+            log_likelihood_latent = torch.distributions.Normal(0, 1).log_prob(z)  # log p_source(z)
+            log_likelihood = log_likelihood_latent + log_d #now a minus here
+            vec_log_likelihood = log_likelihood.sum(1)
         return vec_log_likelihood
 
     def sample(self, n_samples, covariate=False):

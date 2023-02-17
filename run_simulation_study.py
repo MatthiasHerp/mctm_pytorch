@@ -1,5 +1,6 @@
 import pandas as pd
 import mlflow
+import torch
 
 from python_nf_mctm.simulation_study_helpers import *
 from python_nf_mctm.hyperparameter_tuning_helpers import *
@@ -34,6 +35,7 @@ def run_simulation_study(
         degree_transformations_list: list,
         degree_decorrelation_list: list,
         #normalisation_layer_list: list,
+        lambda_penalty_params_list: list = False,
         monotonically_increasing_inverse: bool = True,
         span_factor: float = 0.1,
         span_factor_inverse: float = 0.1,
@@ -97,6 +99,7 @@ def run_simulation_study(
                                             y_validate,
                                             poly_span_abs, iterations_hyperparameter_tuning, spline_decorrelation,
                                         penvalueridge_list, penfirstridge_list, pensecondridge_list,
+                                        lambda_penalty_params_list,
                                         learning_rate_list, patience_list, min_delta_list,
                                         degree_transformations_list, degree_decorrelation_list,
                                             x_train = x_train,
@@ -125,6 +128,7 @@ def run_simulation_study(
         penfirstridge = results.best_params["penfirstridge"]
         pensecondridge = results.best_params["pensecondridge"]
 
+        lambda_penalty_params = lambda_penalty_params_list[0]
         learning_rate = learning_rate_list[0]
         patience = patience_list[0]
         min_delta = min_delta_list[0]
@@ -135,6 +139,7 @@ def run_simulation_study(
         penvalueridge = penvalueridge_list[0]
         penfirstridge = penfirstridge_list[0]
         pensecondridge = pensecondridge_list[0]
+        lambda_penalty_params = lambda_penalty_params_list[0]
         learning_rate = learning_rate_list[0]
         patience = patience_list[0]
         min_delta = min_delta_list[0]
@@ -191,10 +196,11 @@ def run_simulation_study(
 
     # Training the model
     loss_training_iterations, number_iterations, pen_value_ridge_final, pen_first_ridge_final, pen_second_ridge_final,\
-    training_time, fig_training = train(model=nf_mctm,
+    pen_lambda_lasso, training_time, fig_training = train(model=nf_mctm,
                                      train_data=y_train,
                                      train_covariates=x_train,
                                      penalty_params=penalty_params,
+                                     lambda_penalty_params=lambda_penalty_params,
                                      iterations=iterations,
                                      learning_rate=learning_rate,
                                      patience=patience,
@@ -244,7 +250,7 @@ def run_simulation_study(
     fig_kl_divergence_true_model_train = plot_kl_divergence_scatter(y_train, kl_divergence_true_model_train_vec)
 
     # estimate the Multivariate Normal Distribution as Model
-    mean_mvn_model = y_train.mean(0)
+    mean_mvn_model = y_train.mean(0) #0 to do mean across dim 0 not globally
     cov_mvn_model = y_train.T.cov()
     mvn_model = MultivariateNormal(loc=mean_mvn_model, covariance_matrix=cov_mvn_model)
 
@@ -435,8 +441,8 @@ def run_simulation_study(
 if __name__ == '__main__':
 
     run_simulation_study(
-        experiment_id = 2,
-        copula = "joe",
+        experiment_id = 464499768340700910,
+        copula = "3d_joe",
         copula_par = "3",
         train_obs = 2000,
         covariate_exists = False,
@@ -451,18 +457,19 @@ if __name__ == '__main__':
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=10000,
+        iterations=2000,
         iterations_hyperparameter_tuning=5000,
-        iterations_inverse=2000,
+        iterations_inverse=1,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
         degree_transformations_list=[15],
         degree_decorrelation_list=[40],
+        lambda_penalty_params_list=[False],#[torch.tensor([[0,1],[1,0]])],
         #normalisation_layer_list=[None],
         degree_inverse=40,
         monotonically_increasing_inverse=True,
-        hyperparameter_tuning=True,
+        hyperparameter_tuning=False,
         n_samples=2000)
     #TODO: stop the plots all from showing plots
 

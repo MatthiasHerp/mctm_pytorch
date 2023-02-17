@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from torch import optim
 from tqdm import tqdm
 import seaborn as sns
+import warnings
 
 from python_nf_mctm.training_helpers import EarlyStopper
 from python_nf_mctm.bspline_prediction import bspline_prediction
@@ -86,7 +87,7 @@ class Transformation(nn.Module):
         #       Done below, should work
         if inverse:
             new_input=True
-            print("Warning: inverse changes stored basis, set new_input True in next pass through model.")
+            warnings.warn("Warning: inverse changes stored basis, set new_input True in next pass through model.")
         # We only want to define the basis once for the entire training
         if new_input is True or self.multivariate_bernstein_basis is False and self.multivariate_bernstein_basis_derivativ_1 is False:
             self.generate_basis(input, covariate, inverse)
@@ -232,17 +233,28 @@ class Transformation(nn.Module):
         #a, b = torch.meshgrid([torch.linspace(input[:,0].min(),input[:,0].max(),100),torch.linspace(input[:,1].min(),input[:,1].max(),100)])
         #input_space = torch.vstack([a.flatten(),b.flatten()]).T
 
-        input_space = torch.vstack([torch.linspace(input[:,0].min(),input[:,0].max(),10000),torch.linspace(input[:,1].min(),input[:,1].max(),10000)]).T
+        input_space = torch.zeros((10000, self.number_variables), dtype=torch.float32)
+        for var_number in range(self.number_variables):
+            input_space[:, var_number] = torch.linspace(input[:,var_number].min(),input[:,var_number].max(),10000)
+
+        #input_space = torch.vstack([torch.linspace(input[:,0].min(),input[:,0].max(),10000),
+        #                            torch.linspace(input[:,1].min(),input[:,1].max(),10000)]).T
 
         if input_covariate is not False:
             output_space = self.forward(input_space,covariate_space)
         else:
             output_space = self.forward(input_space)
 
-        span_0 = output_space[:, 0].max() - output_space[:, 0].min()
-        span_1 = output_space[:, 1].max() - output_space[:, 1].min()
-        polynomial_range_inverse = torch.tensor([[output_space[:, 0].min() - span_0*span_factor_inverse, output_space[:, 1].min() - span_1*span_factor_inverse],
-                                                 [output_space[:, 0].max() + span_0*span_factor_inverse, output_space[:, 1].max() + span_1*span_factor_inverse]], dtype=torch.float32)
+        polynomial_range_inverse = torch.zeros((2, self.number_variables), dtype=torch.float32)
+        for var_number in range(self.number_variables):
+            span_var_number = output_space[:, var_number].max() - output_space[:, var_number].min()
+            polynomial_range_inverse[:, var_number] = torch.tensor([output_space[:, var_number].min() - span_var_number*span_factor_inverse,
+                                                                    output_space[:, var_number].max() + span_var_number*span_factor_inverse], dtype=torch.float32)
+
+        #span_0 = output_space[:, 0].max() - output_space[:, 0].min()
+        #span_1 = output_space[:, 1].max() - output_space[:, 1].min()
+        #polynomial_range_inverse = torch.tensor([[output_space[:, 0].min() - span_0*span_factor_inverse, output_space[:, 1].min() - span_1*span_factor_inverse],
+        #                                         [output_space[:, 0].max() + span_0*span_factor_inverse, output_space[:, 1].max() + span_1*span_factor_inverse]], dtype=torch.float32)
 
         #input_space = input
         #output_space = multivariable_bernstein_prediction(input_space, self.degree, self.number_variables, self.params, monotonically_increasing=True)

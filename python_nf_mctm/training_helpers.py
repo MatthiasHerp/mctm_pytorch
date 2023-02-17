@@ -1,6 +1,7 @@
 import time
 import copy
 import torch
+import warnings
 from torch import nn
 import numpy as np
 from torch.distributions import Normal, Laplace
@@ -10,8 +11,10 @@ from tqdm import tqdm
 import seaborn as sns
 from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
 
-def objective(y, model, penalty_params, train_covariates=False, avg = True):
-    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global = model(y, covariate=train_covariates, train=True)
+def objective(y, model, penalty_params, lambda_penalty_params: torch.Tensor =False, train_covariates=False, avg = True):
+    #TODO: take the outputted lambda matrix and penalize it based on an additional lasso precision matrix pen matrix
+    #      needs option to pass a symmetric matrix (with diag of 1s) of penalizations or one value applied to alll non dieagonal elements
+    z, log_d, second_order_ridge_pen_global, first_order_ridge_pen_global, param_ridge_pen_global, lambda_matrix_global = model(y, covariate=train_covariates, train=True)
     log_likelihood_latent = Normal(0, 1).log_prob(z) # log p_source(z)
     #print(log_likelihood_latent.size())
     #print(log_d.size())
@@ -21,23 +24,44 @@ def objective(y, model, penalty_params, train_covariates=False, avg = True):
     pen_first_ridge = penalty_params[1] * first_order_ridge_pen_global
     pen_second_ridge = penalty_params[2] * second_order_ridge_pen_global
 
+    # Penalty for the Lambda Matrix,
+    # note that for the other penalties the ridge is already computed in layers here we first need to do absolute values
+    if lambda_penalty_params is not False:
+        if torch.diag(lambda_penalty_params, 0).sum() != 0:
+            warnings.warn("Warning: diagonal of lambda penalty matrix is not zero")
+        if not (lambda_penalty_params.transpose(0, 1) == lambda_penalty_params).all():
+            warnings.warn("Warning: lambda penalty matrix is not symmetric")
+        # Note: need here was we did not do that in the layers
+        pen_lambda_lasso = (lambda_penalty_params.unsqueeze(0) * torch.abs(lambda_matrix_global)).mean()
+    else:
+        pen_lambda_lasso = 0
+
     neg_likelihood = (- log_likelihood_latent - log_d).sum()
 
     if avg:
+        # need to compute number of parameters to average correctly
+        number_variables = y.size(1)
+        number_lambda_matrix_entries = number_variables * (number_variables - 1) / 2
+        number_params_lambda = 3 * number_lambda_matrix_entries * model.degree_decorrelation
+        # For decorrelatioon layer degree == number of parameters
+
         # We average the loss and the penalties
         # By averaging the penalties we make the penalisation magnitude independent of the number of knots
-        pen_value_ridge = 1 / (3*model.degree_decorrelation) * pen_value_ridge
-        pen_first_ridge = 1 / (3*model.degree_decorrelation) * pen_first_ridge
-        pen_second_ridge = 1 / (3*model.degree_decorrelation) * pen_second_ridge
+        pen_value_ridge = pen_value_ridge / number_params_lambda
+        pen_first_ridge = pen_first_ridge / number_params_lambda
+        pen_second_ridge = pen_second_ridge / number_params_lambda
+
+        pen_lambda_lasso = pen_lambda_lasso / number_lambda_matrix_entries
 
         neg_likelihood = 1 / (z.size(0)*z.size(1)) * neg_likelihood
 
     loss = neg_likelihood + \
            pen_value_ridge + \
            pen_first_ridge +  \
-           pen_second_ridge
+           pen_second_ridge + \
+           pen_lambda_lasso
 
-    return loss, pen_value_ridge, pen_first_ridge, pen_second_ridge
+    return loss, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso
 
 class EarlyStopper:
     def __init__(self, patience=1, min_delta=0., global_min_loss=-np.inf):
@@ -81,14 +105,15 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
+def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
     opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
     def closure():
         opt.zero_grad()
         loss, pen_value_ridge, \
-        pen_first_ridge, pen_second_ridge  = objective(y, model, penalty_params, train_covariates=train_covariates) # use the `objective` function
+        pen_first_ridge, pen_second_ridge, \
+        pen_lambda_lasso  = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates) # use the `objective` function
         #loss.backward() # backpropagate the loss
         return loss
 
@@ -116,15 +141,17 @@ def optimize(y, model, objective, penalty_params, train_covariates=False, learni
     model.load_state_dict(early_stopper.best_model_state)
 
     # Rerun model at the end to get final penalties
-    _, pen_value_ridge, pen_first_ridge, pen_second_ridge = objective(y, model, penalty_params, train_covariates=train_covariates)
+    _, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
 
-    return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge
+    return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso
 
-def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
+def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), lambda_penalty_params=False, learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
 
     if return_report:
         start = time.time()
-        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+        loss_list, number_iterations, \
+        pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
+                                                                                        learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
         end = time.time()
 
         training_time = end - start
@@ -135,10 +162,11 @@ def train(model, train_data, train_covariates=False, penalty_params=torch.FloatT
         plt.xlabel("Iteration")
         plt.ylabel("Loss")
 
-        return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, training_time, fig
+        return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso, training_time, fig
 
     else:
-        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
+                                                                                                                      learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
 
 #TODO: Outdated function when we merely tested with Laplace example from probML lecture

@@ -27,6 +27,12 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
     first_order_ridge_pen_sum = 0
     param_ridge_pen_sum = 0
 
+    # Matrix dimensions:
+    # axis 0: number of samples
+    # axis 1, 2: number of variables e.g. the lambda matrix of each particular sample
+    lambda_matrix_a = torch.eye(number_variables).expand(output.size()[0],number_variables,number_variables)
+    lambda_matrix = lambda_matrix_a.clone()
+
     for var_num in range(number_variables):
         #print(var_num)
         # loop over all before variables
@@ -103,11 +109,15 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
             params_index += 1
 
+            # filling the lambda matrix with the computed entries
+            lambda_matrix[:,var_num,covar_num] = lambda_value
+
     if inverse:
         return output
     else:
-        return output, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
-
+        return output, \
+               second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum,\
+               lambda_matrix
 
 class Decorrelation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range, spline="bspline", span_factor=0.1, span_restriction="None",
@@ -142,7 +152,8 @@ class Decorrelation(nn.Module):
 
         if not inverse:
             output, second_order_ridge_pen_sum, \
-            first_order_ridge_pen_sum, param_ridge_pen_sum = multivariable_lambda_prediction(input,
+            first_order_ridge_pen_sum, param_ridge_pen_sum, \
+            lambda_matrix = multivariable_lambda_prediction(input,
                                                      self.degree,
                                                      self.number_variables,
                                                      self.params,
@@ -167,7 +178,7 @@ class Decorrelation(nn.Module):
                                                      params_covariate = self.params_covariate)
 
         if return_log_d and return_penalties:
-            return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum
+            return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum, lambda_matrix
         elif return_log_d:
             return output, log_d
         else:

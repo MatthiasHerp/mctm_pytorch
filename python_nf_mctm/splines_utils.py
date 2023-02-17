@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import warnings
 
 def adjust_ploynomial_range(polynomial_range: object, span_factor: object) -> object:
     span = polynomial_range[1] - polynomial_range[0]
@@ -15,6 +16,13 @@ class ReLULeR(): #nn.Module
         self.l1 = nn.ReLU()
 
     def forward(self,x: torch.Tensor):
+        if torch.any(x < self.polynomial_range[0]):
+            warnings.warn("Warning: x is smaller than polynomial_range[0], "
+                          "maybe you should adjust the polynomial_range to be smaller")
+        if torch.any(x > self.polynomial_range[1]):
+            warnings.warn("Warning: x is bigger than polynomial_range[1], "
+                          "maybe you should adjust the polynomial_range to be larger")
+
         #x element [-polynomial_range_abs, polynomial_range_abs]
         #x_0_1_theory element [0, 1] in theory
         x_0_1_theory = (x - self.polynomial_range[0]) / (self.polynomial_range[1] - self.polynomial_range[0])
