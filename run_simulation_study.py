@@ -42,6 +42,7 @@ def run_simulation_study(
         span_restriction: str = None,
         degree_inverse: int = 0,
         hyperparameter_tuning: bool = True,
+        tune_precision_matrix_penalty: bool = False,
         iterations_hyperparameter_tuning: int = 1500,
         n_samples: int = 2000):
 
@@ -104,7 +105,8 @@ def run_simulation_study(
                                         learning_rate_list, patience_list, min_delta_list,
                                         degree_transformations_list, degree_decorrelation_list,
                                             x_train = x_train,
-                                            x_validate = x_validate) #normalisation_layer_list
+                                            x_validate = x_validate,
+                                            tune_precision_matrix_penalty=tune_precision_matrix_penalty) #normalisation_layer_list
 
         fig_hyperparameter_tuning_cooordinate = optuna.visualization.plot_parallel_coordinate(results)
         fig_hyperparameter_tuning_contour = optuna.visualization.plot_contour(results)
@@ -459,10 +461,10 @@ if __name__ == '__main__':
 
     run_simulation_study(
         experiment_id = 464499768340700910,
-        copula = "joe",
-        copula_par = "covariate",
-        train_obs = 5000,
-        covariate_exists = True,
+        copula = "3d_joe",
+        copula_par = 43,
+        train_obs = 2000,
+        covariate_exists = False,
         # Setting Hyperparameter Values
         seed_value=1,
         penvalueridge_list=[0],
@@ -474,9 +476,9 @@ if __name__ == '__main__':
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=1000,
+        iterations=10000,
         iterations_hyperparameter_tuning=5000,
-        iterations_inverse=10,
+        iterations_inverse=5000,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
@@ -486,7 +488,8 @@ if __name__ == '__main__':
         #normalisation_layer_list=[None],
         degree_inverse=40,
         monotonically_increasing_inverse=True,
-        hyperparameter_tuning=False,
+        hyperparameter_tuning=True,
+        tune_precision_matrix_penalty=True,
         n_samples=5000)
     #TODO: stop the plots all from showing plots
 

@@ -24,7 +24,8 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           degree_decorrelation_list: list,
                           x_train: torch.Tensor = False,
                           x_validate: torch.Tensor = False,
-                          tuning_mode="optuna"):
+                          tuning_mode="optuna",
+                          tune_precision_matrix_penalty=False):
                           #normalisation_layer_list: list):
     """
     Generates List of all combinations of hyperparameter values from lists
@@ -70,6 +71,13 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                                            penfirstridge_opt,
                                            pensecondridge_opt])
 
+            if tune_precision_matrix_penalty == True:
+                lambda_penalty_params_opt = trial.suggest_float("lambda_penalty_params", 0.001, 10, log=True)
+                num_vars = y_train.size()[1]
+                lambda_penalty_params_opt = torch.tensor(lambda_penalty_params_opt).repeat(num_vars,num_vars) - torch.eye(num_vars,num_vars) * lambda_penalty_params_opt
+            else:
+                lambda_penalty_params_opt = lambda_penalty_params
+
             # for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(y.size()[0]))):
             #    y_train = y[train_idx, :]
             #    y_validate = y[val_idx, :]
@@ -93,7 +101,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                   train_data=y_train,
                   train_covariates=x_train,
                   penalty_params=penalty_params,
-                  lambda_penalty_params=lambda_penalty_params,
+                  lambda_penalty_params=lambda_penalty_params_opt,
                   iterations=iterations,
                   learning_rate=learning_rate,
                   patience=patience,
