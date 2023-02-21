@@ -3,9 +3,18 @@ import numpy as np
 import functorch
 from python_nf_mctm.splines_utils import adjust_ploynomial_range, ReLULeR, custom_sigmoid
 
+def x_in_intervall(x, i, t):
+    # if t[i] <= x < t[i+1] then this is one, otherwise zero
+    return torch.where(t[i] <= x,
+                       torch.FloatTensor([1.0]),
+                       torch.FloatTensor([0.0])) * \
+           torch.where(x < t[i+1],
+                       torch.FloatTensor([1.0]),
+                       torch.FloatTensor([0.0]))
+
 def B(x, k, i, t):
     if k == 0:
-       return torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
+       return x_in_intervall(x, i, t) #torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
     if t[i+k] == t[i]:
        c1 = torch.FloatTensor([0.0])
     else:
@@ -16,38 +25,127 @@ def B(x, k, i, t):
        c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t)
     return c1 + c2
 
+def B_vmap(x, k, i, t, knot):
+    if knot < t[i-k] or knot > t[i+k]:
+       return torch.FloatTensor([0.0])
+    if k == 0:
+       return x_in_intervall(x, i, t) #torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
+    if t[i+k] == t[i]:
+       c1 = torch.FloatTensor([0.0])
+    else:
+       c1 = (x - t[i])/(t[i+k] - t[i]) * B(x, k-1, i, t)
+    if t[i+k+1] == t[i+1]:
+       c2 = torch.FloatTensor([0.0])
+    else:
+       c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t)
+    return c1 + c2
+
+#def k_is_zero(k):
+#    # if k == 0 then this is zero, otherwise one
+#    return torch.where(k==torch.tensor(0), torch.FloatTensor([0.0]), torch.FloatTensor([1.0]))
+#
+#def x_in_intervall(x, i, t):
+#    # if t[i] <= x < t[i+1] then this is one, otherwise zero
+#    return torch.where(t[i] <= x,
+#                       torch.FloatTensor([1.0]),
+#                       torch.FloatTensor([0.0])) * \
+#           torch.where(x < t[i+1],
+#                       torch.FloatTensor([1.0]),
+#                       torch.FloatTensor([0.0]))
+#
+#def c1(x, k, i, t):
+#    # computes first part of the bspline
+#    return torch.where(k>torch.tensor(0),
+#                       torch.where(t[i + k] == t[i],
+#                                   torch.FloatTensor([0.0]),
+#                                    (x - t[i]) / (t[i + k] - t[i]) * B_vmap(x, k - 1, i, t)),
+#                          torch.FloatTensor([0.0]))
+#
+#def c2(x, k, i, t):
+#    # computes second part of the bspline
+#    return torch.where(k>torch.tensor(0),
+#                       torch.where(t[i + k + 1] == t[i + 1],
+#                                   torch.FloatTensor([0.0]),
+#                                   (t[i + k + 1] - x) / (t[i + k + 1] - t[i + 1]) * B_vmap(x, k - 1, i + 1, t)),
+#                          torch.FloatTensor([0.0]))
+#def B_vmap(x, k, i, t):
+#    print(k)
+#    # computes the bspline with 2 options:
+#    # 1. if k == 0 then return 1 if x is in the intervall [t[i], t[i+1]) and 0 otherwise
+#    # 2. if k != 0 then return the bspline
+#    return torch.where(k>torch.tensor(0),
+#                c1(x, k, i, t) + c2(x, k, i, t),
+#                x_in_intervall(x, i, t))
+#    #return (c1(x, k, i, t) + c2(x, k, i, t)) * k_is_zero(k) + (1-k_is_zero(k)) * x_in_intervall(x, i, t)
+
 def Naive(x, t, c, p):
     n = len(t) - p - 1 -1
-    assert (n >= p+1) and (len(c) >= n)
-    pred = x.clone()
-    for obs_num in range(x.size(0)):
-        pred[obs_num] = sum(c[i] * B(x[obs_num], p, i, t) for i in range(n))
+    #assert (n >= p+1) and (len(c) >= n)
+    #pred = x.clone()
+    #for obs_num in range(x.size(0)):
+    #    pred[obs_num] = sum(c[i] * B(x[obs_num], p, i, t) for i in range(n))
+
+    pred = sum(c[i] * B(x, p, i, t) for i in range(n))
 
     return pred
 
 # cannot use vmap here as B(x, k, i, t) contains if statments which vmap does not support yet:
 # https://github.com/pytorch/functorch/issues/257
-#class Naive():
-#    def __init__(self,t,c,p):
-#        self.t=t
-#        self.c=c
-#        self.p=p
-#        self.n = t.size(0) - 2 * self.p
-#
-#    def compute_prediction(self, x):
-#        n = len(self.t) - self.p - 1 -1
-#        assert (n >= self.p+1) and (len(self.c) >= n)
-#        pred = x.clone()
-#        for obs_num in range(x.size(0)):
-#            pred[obs_num] = sum(self.c[i] * B(x[obs_num], self.p, i, self.t) for i in range(n))
-#
-#        return pred
+class Naive_vmap():
+    def __init__(self,t,c,p):
+        self.t=t
+        self.c=c
+        self.p=p
+        self.n = t.size(0) - 2 * self.p
 
-#def run_Naive(x, t, c, p):
-#    Naive_obj = Naive(t=t, c=c, p=p)
-#    Naive_func_vectorized = functorch.vmap(Naive_obj.compute_prediction)
-#
-#    return Naive_func_vectorized(torch.unsqueeze(x,0)).squeeze()
+    def compute_knot(self, x):
+
+        k = torch.searchsorted(self.t, x) - 1
+        k[k > (self.n - 1)] = 2 + 1
+        k[k > (self.n - 1)] = 2 + (self.n - 1) - 1
+
+        self.knots = k
+
+    def compute_prediction(self, x):
+        n = len(self.t) - self.p - 1 -1
+        #assert (n >= self.p+1) and (len(self.c) >= n)
+        #pred = x.clone()
+        #for obs_num in range(x.size(0)):
+            #knot_num = knot[torch.tensor(obs_num)[None]][0]
+            #pred[obs_num] = sum(self.c[i] * B(x[obs_num], self.p, i, self.t) for i in range(n)) #knot_num-self.p,knot_num+self.p
+        #Works
+        #pred = sum(self.c[i] * torch.vstack([B_vmap(x[obs_num], self.p, 0, self.t, self.knots[obs_num]) for obs_num in range(x.size(0))]).squeeze() for i in range(n))
+        # Does not work
+        #pred = sum(self.c[i] * functorch.vmap(B_vmap)(x, self.p, i, self.t, self.knots) for i in range(n))
+
+        def B_vmap(i,obs_num):
+            if self.knots[obs_num] < self.t[i - self.p] or self.knots[obs_num] > self.t[i + self.p]:
+                return torch.FloatTensor([0.0])
+            if k == 0:
+                return x_in_intervall(x[obs_num], i,
+                                      self.t)  # torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
+            if self.t[i + self.p] == self.t[i]:
+                c1 = torch.FloatTensor([0.0])
+            else:
+                c1 = (x[obs_num] - self.t[i]) / (self.t[i + self.p] - self.t[i]) * B(x[obs_num], self.k - 1, i, self.t)
+            if self.t[i + self.p + 1] == self.t[i + 1]:
+                c2 = torch.FloatTensor([0.0])
+            else:
+                c2 = (self.t[i + self.p + 1] - x[obs_num]) / (self.t[i + self.p + 1] - self.t[i + 1]) * B(x[obs_num], self.p - 1, i + 1, self.t)
+            return c1 + c2
+
+        pred = sum(self.c[i] * torch.vstack([B_vmap(i,obs_num) for obs_num in range(x.size(0))]).squeeze() for i in range(n))
+
+        return pred
+
+def run_Naive_vmap(x, t, c, p):
+    Naive_vmap_obj = Naive_vmap(t=t, c=c, p=p)
+
+    Naive_vmap_obj.compute_knot(x)
+
+    Naive_vmap_func_vectorized = functorch.vmap(Naive_vmap_obj.compute_prediction)
+
+    return Naive_vmap_func_vectorized(torch.unsqueeze(x, 0)).squeeze()
 
 class deBoor():
     def __init__(self,t,c,p):
@@ -133,6 +231,12 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
                            t=knots,
                            c=params_restricted,
                            p=order)
+
+    elif calc_method == "Naive_vmap":
+        prediction = run_Naive_vmap(x=input_a_clone,
+                                    t=knots,
+                                    c=params_restricted,
+                                    p=order)
 
     # Adding Covariate in a GAM manner
     if covariate is not False:
