@@ -101,6 +101,8 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
         numbers_covariates = 1
     else:
 
+        #binning the covariates
+        # as explained here: https://discuss.pytorch.org/t/binning-tensor-values/89998
         covariate = torch.round(covariate/0.2)*0.2
         numbers_covariates = torch.unique(covariate).size(0)
         covariate_values = torch.unique(covariate)
@@ -121,8 +123,8 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
                         sns.scatterplot(x=sub_data[:, j], y=sub_data[:, i], hue=sub_covariate, alpha=0.6, color="k", ax=axs[c,a])
                         sns.kdeplot(x=sub_data[:,j], y=sub_data[:,i], fill=True, alpha=0.9, ax=axs[c,a])
 
-                axs[c,a].set_xlim(x_lim)
-                axs[c,a].set_ylim(y_lim)
+                        axs[c,a].set_xlim(x_lim)
+                        axs[c,a].set_ylim(y_lim)
 
                 a += 1
 
