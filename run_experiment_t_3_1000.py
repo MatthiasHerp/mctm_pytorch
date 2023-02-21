@@ -4,21 +4,21 @@ import torch
 
 if __name__ == "__main__":
 
-    #mlflow.create_experiment(name="joe_covariate_2000")
-    experiment = mlflow.get_experiment_by_name("joe_covariate_2000")
+    mlflow.create_experiment(name="t_3_1000")
+    experiment = mlflow.get_experiment_by_name("t_3_1000")
 
     #source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
-    torch.set_num_interop_threads(100)  # Inter-op parallelism
-    torch.set_num_threads(100)  # Intra-op parallelism
+    torch.set_num_interop_threads(50)  # Inter-op parallelism
+    torch.set_num_threads(50)  # Intra-op parallelism
 
     for seed_num in range(1,21):
 
         run_simulation_study(
                 experiment_id = experiment.experiment_id,
-                copula = "joe",
-                copula_par = "covariate",
-                covariate_exists=True,
-                train_obs = 2000,
+                copula = "t",
+                copula_par = 3,
+                covariate_exists=False,
+                train_obs = 1000,
                 # Setting Hyperparameter Values
                 seed_value=seed_num,
                 penvalueridge_list=[0],
@@ -43,4 +43,5 @@ if __name__ == "__main__":
                 degree_inverse=40,
                 monotonically_increasing_inverse=True,
                 hyperparameter_tuning=True,
+                tune_precision_matrix_penalty=False,
                 n_samples=2000)
