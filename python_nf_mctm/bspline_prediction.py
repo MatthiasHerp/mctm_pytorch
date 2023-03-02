@@ -89,6 +89,45 @@ def Naive(x, t, c, p):
 
     return pred
 
+from python_nf_mctm.bernstein_prediction import kron
+
+def Naive_Basis(x, polynomial_range, degree, span_factor):
+    order = 2
+    p = order
+    n = degree + 1
+    distance_between_knots = (polynomial_range[1] - polynomial_range[0]) * span_factor / (n - 1)
+
+    knots = torch.tensor(np.linspace(polynomial_range[0] - order * distance_between_knots,
+                                     polynomial_range[1] + order * distance_between_knots,
+                                     n + 4), dtype=torch.float32)
+    t = knots
+
+
+    n = len(t) - p - 1 - 1
+    return torch.vstack([B(x, p, i, t) for i in range(n)]).T
+
+def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False):
+    # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
+
+    if covariate is not False:
+        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1)*(degree+1), input.size(1)))
+    else:
+        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)))
+
+    for var_num in range(input.size(1)):
+        input_basis = Naive_Basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor)
+        if covariate is not False:
+            #covariate are transformed between 0 and 1 before inputting into the model
+            # dont take the derivativ w.r.t to the covariate when computing jacobian of the transformation
+            covariate_basis = Naive_Basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor)
+            basis = kron(input_basis, covariate_basis)
+        else:
+            basis = input_basis
+
+        multivariate_bspline_basis[:,:,var_num] = basis
+
+    return multivariate_bspline_basis
+
 # cannot use vmap here as B(x, k, i, t) contains if statments which vmap does not support yet:
 # https://github.com/pytorch/functorch/issues/257
 class Naive_vmap():

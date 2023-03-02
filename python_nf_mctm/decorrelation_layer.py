@@ -44,6 +44,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
             if inverse:
                 #output into spline
                 if spline == "bspline":
+                        #Note: params_index get +=1 at the end so that we always have the right parameters (this needs to be changed for apply vectorisation)
                         lambda_value = bspline_prediction(params[:, params_index],
                                                           output[:, covar_num],
                                                           degree,
