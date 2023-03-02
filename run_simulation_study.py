@@ -1,17 +1,23 @@
 import pandas as pd
 import mlflow
 import torch
+import os
 
 from python_nf_mctm.simulation_study_helpers import *
 from python_nf_mctm.hyperparameter_tuning_helpers import *
+from python_nf_mctm.nf_mctm import NF_MCTM
+from python_nf_mctm.nf_mctm_4 import NF_MCTM_4
 
 def log_mlflow_plot(fig,file_name,type="plt"):
+
+    #the_wd = os.getcwd()
+
     if type == "plt":
         fig.savefig(file_name)
     elif type == "plotly":
         fig.write_html(file_name)
 
-    mlflow.log_artifact("./"+file_name)
+    mlflow.log_artifact("./"+file_name) #"./" the_wd
 
 def run_simulation_study(
         experiment_id: int,
@@ -44,7 +50,8 @@ def run_simulation_study(
         hyperparameter_tuning: bool = True,
         tune_precision_matrix_penalty: bool = False,
         iterations_hyperparameter_tuning: int = 1500,
-        n_samples: int = 2000):
+        n_samples: int = 2000,
+        num_decorr_layers: int = 3):
 
     #TODO: harmonize the covariate arguement (have number_covariates, covariate_exists, covariate, also = False etc..)
 
@@ -153,6 +160,7 @@ def run_simulation_study(
         # Logging the hyperparameters
     # mlflow.log_param(key="copula", value=copula)
     # mlflow.log_param(key="seed", value=seed_value)
+    mlflow.log_param(key="number_decorrelation_layers", value=num_decorr_layers)
     mlflow.log_param(key="pen_value_ridge", value=penvalueridge)
     mlflow.log_param(key="pen_first_ridge", value=penfirstridge)
     mlflow.log_param(key="pen_second_ridge", value=pensecondridge)
@@ -194,7 +202,8 @@ def run_simulation_study(
                       degree_decorrelation=int(degree_decorrelation),
                       span_factor = span_factor,
                       span_restriction = span_restriction,
-                      number_covariates=number_covariates)
+                      number_covariates=number_covariates,
+                      num_decorr_layers=num_decorr_layers)
                       #normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -211,15 +220,17 @@ def run_simulation_study(
                                      verbose=False)
 
     # Training the inverse of the model
-    fig_training_inverse = nf_mctm.l1.approximate_inverse(input=y_train,
-                                                          input_covariate=x_train,
-                                                          spline_inverse=spline_inverse,
-                                                          degree_inverse=degree_inverse,
-                                                          monotonically_increasing_inverse=monotonically_increasing_inverse,
-                                                          iterations=iterations_inverse,
-                                                          span_factor_inverse=span_factor_inverse,
-                                                          patience=20,
-                                                          global_min_loss=0.001)
+    #fig_training_inverse = as we do not train it is a closed form solution
+    #before l1
+    nf_mctm.transformation.approximate_inverse(input=y_train,
+                                   input_covariate=x_train,
+                                   spline_inverse=spline_inverse,
+                                   degree_inverse=degree_inverse,
+                                   monotonically_increasing_inverse=monotonically_increasing_inverse,
+                                   iterations=iterations_inverse,
+                                   span_factor_inverse=span_factor_inverse,
+                                   patience=20,
+                                   global_min_loss=0.001)
 
     #### Training Evaluation
 
@@ -227,10 +238,20 @@ def run_simulation_study(
 
     fig_y_train = plot_densities(y_train, covariate=x_train, x_lim=[y_train.min(),y_train.max()], y_lim=[y_train.min(),y_train.max()])
 
-    fig_splines_transformation_layer_1 = plot_splines(layer= nf_mctm.l1, y_train=y_train, covariate_exists=covariate_exists)
-    fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2, covariate_exists=covariate_exists)
-    fig_splines_decorrelation_layer_4 = plot_splines(layer= nf_mctm.l4, covariate_exists=covariate_exists)
-    fig_splines_decorrelation_layer_6 = plot_splines(layer= nf_mctm.l6, covariate_exists=covariate_exists)
+
+    fig_splines_transformation_layer = plot_splines(layer=nf_mctm.transformation, y_train=y_train,covariate_exists=covariate_exists)
+    log_mlflow_plot(fig_splines_transformation_layer, 'plot_splines_transformation_layer.png')
+
+    for i in range(nf_mctm.number_decorrelation_layers):
+        fig_splines_decorrelation_layer = plot_splines(layer=nf_mctm.decorrelation_layers[i], y_train=y_train, covariate_exists=covariate_exists)
+        log_mlflow_plot(fig_splines_decorrelation_layer, 'plot_splines_decorrelation_layer_{}.png'.format(i))
+
+    #fig_splines_decorrelation_layer_2 = plot_splines(layer= nf_mctm.l2, covariate_exists=covariate_exists)
+    #fig_splines_decorrelation_layer_4 = plot_splines(layer= nf_mctm.l4, covariate_exists=covariate_exists)
+    #fig_splines_decorrelation_layer_6 = plot_splines(layer= nf_mctm.l6, covariate_exists=covariate_exists)
+
+    #if num_decorr_layers == 4:
+    #    fig_splines_decorrelation_layer_8 = plot_splines(layer=nf_mctm.l8, covariate_exists=covariate_exists)
 
     # Evaluate latent space of the model in training set
     z_train = nf_mctm.latent_space_representation(y_train, x_train).detach().numpy()
@@ -322,7 +343,7 @@ def run_simulation_study(
     model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
 
     log_mlflow_plot(fig_training,'plot_training.png')
-    log_mlflow_plot(fig_training_inverse,'plot_training_inverse.png')
+    #log_mlflow_plot(fig_training_inverse,'plot_training_inverse.png')
 
     #fig_training.savefig('plot_training.png')
     #mlflow.log_artifact("./plot_training.png")
@@ -339,10 +360,12 @@ def run_simulation_study(
     np.save("loss_training_iterations.npy", loss_training_iterations)
     mlflow.log_artifact("./loss_training_iterations.npy")
 
-    log_mlflow_plot(fig_splines_transformation_layer_1,'plot_splines_transformation_layer_1.png')
-    log_mlflow_plot(fig_splines_decorrelation_layer_2,'plot_splines_decorrelation_layer_2.png')
-    log_mlflow_plot(fig_splines_decorrelation_layer_4,'plot_splines_decorrelation_layer_4.png')
-    log_mlflow_plot(fig_splines_decorrelation_layer_6,'plot_splines_decorrelation_layer_6.png')
+    #log_mlflow_plot(fig_splines_transformation_layer_1,'plot_splines_transformation_layer_1.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_2,'plot_splines_decorrelation_layer_2.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_4,'plot_splines_decorrelation_layer_4.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_6,'plot_splines_decorrelation_layer_6.png')
+    #if num_decorr_layers == 4:
+    #    log_mlflow_plot(fig_splines_decorrelation_layer_8,'plot_splines_decorrelation_layer_8.png')
 
     log_mlflow_plot(fig_precision_matrix_nf_mctm_train,'plot_precision_matrix_nf_mctm_train.png')
     log_mlflow_plot(fig_hist_precision_matrix_nf_mctm_train,'plot_hist_precision_matrix_nf_mctm_train.png')
@@ -446,12 +469,12 @@ def run_simulation_study(
     #mlflow.log_artifact("./plot_synthetically_sampled_data.png")
 
     #create table of all coefficients of the bsplines
-    bspline_table = pd.DataFrame()
-    bspline_table["bspline_1"] = nf_mctm.l2.params.detach().numpy().flatten()
-    bspline_table["bspline_2"] = nf_mctm.l4.params.detach().numpy().flatten()
-    bspline_table["bspline_3"] = nf_mctm.l6.params.detach().numpy().flatten()
-    bspline_table.to_csv("bspline_table.csv")
-    mlflow.log_artifact("./bspline_table.csv")
+    #bspline_table = pd.DataFrame()
+    #bspline_table["bspline_1"] = nf_mctm.l2.params.detach().numpy().flatten()
+    #bspline_table["bspline_2"] = nf_mctm.l4.params.detach().numpy().flatten()
+    #bspline_table["bspline_3"] = nf_mctm.l6.params.detach().numpy().flatten()
+    #bspline_table.to_csv("bspline_table.csv")
+    #mlflow.log_artifact("./bspline_table.csv")
 
     # End the run
     print("Finished Run")
@@ -459,37 +482,42 @@ def run_simulation_study(
 
 if __name__ == '__main__':
 
+    print(os.getcwd())
+    #mlflow.create_experiment(name="server_test")
+    experiment = mlflow.get_experiment_by_name("server_test")
+
     run_simulation_study(
-        experiment_id = 464499768340700910,
-        copula = "3d_joe",
-        copula_par = 43,
+        experiment_id = experiment.experiment_id, #464499768340700910,
+        copula = "t",
+        copula_par = 3,
         train_obs = 2000,
         covariate_exists = False,
         # Setting Hyperparameter Values
-        seed_value=1,
+        seed_value=38,
         penvalueridge_list=[0],
-        penfirstridge_list=[0],
-        pensecondridge_list=[0],
+        penfirstridge_list=[0.0011905053869227847],
+        pensecondridge_list=[1.0482049179893074],
         poly_span_abs=15,
         spline_decorrelation="bspline",
-        spline_inverse="bernstein",
+        spline_inverse="bspline",
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=10000,
+        iterations=100,
         iterations_hyperparameter_tuning=5000,
         iterations_inverse=5000,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
         patience_list=[10],
         min_delta_list=[1e-8],
-        degree_transformations_list=[15],
+        degree_transformations_list=[30],
         degree_decorrelation_list=[40],
         lambda_penalty_params_list=[False], #[torch.tensor([[0,1,1],[1,0,1],[1,1,0]])],
         #normalisation_layer_list=[None],
-        degree_inverse=40,
+        degree_inverse=150,
         monotonically_increasing_inverse=True,
-        hyperparameter_tuning=True,
-        tune_precision_matrix_penalty=True,
-        n_samples=5000)
+        hyperparameter_tuning=False,
+        tune_precision_matrix_penalty=False,
+        n_samples=5000,
+        num_decorr_layers=5)
     #TODO: stop the plots all from showing plots
 

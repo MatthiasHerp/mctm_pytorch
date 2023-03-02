@@ -115,7 +115,9 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
             if i != j:
                 if covariate is False:
                     sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[a])
-                    sns.kdeplot(x=data[:, j], y=data[:, i], fill=True, alpha=0.9, ax=axs[a])
+                    #TODO:  got ValueError: Contour levels must be increasing
+                    # suggestion on whre it came from: https://stackoverflow.com/questions/62233779/valueerror-contour-levels-must-be-increasing-contour-plot-in-python
+                    #sns.kdeplot(x=data[:, j], y=data[:, i], fill=True, alpha=0.9, ax=axs[a])
                 else:
                     for c in range(numbers_covariates):
                         sub_data = data[covariate == covariate_values[c]]
@@ -141,10 +143,10 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
                 sns.scatterplot(x=sub_data[:, 0], y=sub_data[:, 1], hue=sub_covariate, alpha=0.6, color="k",
                                 ax=ax[c])
                 sns.kdeplot(x=sub_data[:, 0], y=sub_data[:, 1], fill=True, alpha=0.9, ax=ax[c,])
-        #if x_lim is not None:
-        #    ax.set_xlim(x_lim)
-        #if y_lim is not None:
-        #    ax.set_ylim(y_lim)
+        if x_lim is not None:
+            ax.set_xlim(x_lim)
+        if y_lim is not None:
+            ax.set_ylim(y_lim)
 
     return fig
 
@@ -269,14 +271,16 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
     #num_variables = layer.number_variables
 
     if layer.type == "transformation":
-        poly_min = y_train.min()
-        poly_max = y_train.max()
+        poly_min = y_train.min(0).values
+        poly_max = y_train.max(0).values
     elif layer.type == "decorrelation":
-        poly_min = layer.polynomial_range[0,0]
-        poly_max = layer.polynomial_range[1,0]
+        poly_min = layer.polynomial_range[0,:]
+        poly_max = layer.polynomial_range[1,:]
 
-    data_span = torch.linspace(poly_min,poly_max,100)
-    data_span_vec = data_span.reshape((100,1)).repeat(1,num_splines)
+
+    data_span_vec = torch.zeros((1000,num_splines), dtype=torch.float32)
+    for i in range(num_splines):
+        data_span_vec[:,i] = torch.linspace(poly_min[i],poly_max[i],1000)
 
     if layer.type == "transformation":
         results = pd.DataFrame(columns=["y", "y_estimated", "z_tilde", "z_tilde_derivativ", "covariate", "spline_num"])
@@ -373,11 +377,19 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
             #    axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
             #elif layer.type == "decorrelation":
             #    axs[a].set_ylim(-2, 2)
-            axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
-            axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
+            if layer.type == "transformation":
+                axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
+                axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
 
-            axs[a].set_xlabel("z_tilde")
-            axs[a].set_ylabel("lambda_" + str(spline_num))
+                axs[a].set_xlabel("y_" + str(spline_num))
+                axs[a].set_ylabel("z_tilde" + str(spline_num))
+
+            elif layer.type == "decorrelation":
+                axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
+                axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
+
+                axs[a].set_xlabel("z_tilde")
+                axs[a].set_ylabel("lambda_" + str(spline_num))
 
             a+=1
 
