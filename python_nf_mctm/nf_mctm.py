@@ -152,7 +152,7 @@ from python_nf_mctm.decorrelation_layer import Decorrelation
 class NF_MCTM(nn.Module):
     def __init__(self, input_min, input_max, polynomial_range, number_variables, spline_decorrelation="bernstein",
                  degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction="None",
-                 number_covariates=False, num_decorr_layers=3): #normalisation_layer=None
+                 number_covariates=False, num_decorr_layers=3, list_comprehension=False): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
@@ -171,6 +171,8 @@ class NF_MCTM(nn.Module):
         polynomial_range_decorrelation = polynomial_range.repeat(1,self.number_variables)
 
         self.number_covariates = number_covariates
+
+        self.list_comprehension = list_comprehension
 
         #if self.normalisation_layer == "bounding":
         #    self.l0 = Normalisation(input_min=self.input_min, input_max=self.input_max, output_range=polynomial_range[1]-polynomial_range[1]*0.25)
@@ -211,7 +213,8 @@ class NF_MCTM(nn.Module):
         self.decorrelation_layers = nn.ModuleList([Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables,
                                 polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor,
                                 span_restriction=self.span_restriction, spline=spline_decorrelation,
-                                number_covariates=self.number_covariates) for i in range(self.number_decorrelation_layers)])
+                                number_covariates=self.number_covariates,
+                                list_comprehension = self.list_comprehension) for i in range(self.number_decorrelation_layers)])
 
     def forward(self, y, covariate=False, train=True, evaluate=True):
         # Normalisation

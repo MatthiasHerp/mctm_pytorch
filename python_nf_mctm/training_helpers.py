@@ -106,7 +106,7 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01):
+def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01, optimizer='LBFGS'):
     opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
@@ -124,11 +124,25 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
     loss.backward()
     options = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
 
+    if optimizer == "Adam":
+        opt = optim.Adam(model.parameters(), lr = learning_rate, weight_decay=0.1)
+        scheduler = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.5)
+
     loss_list = []
     for i in tqdm(range(iterations)):
         number_iterations = i
 
-        current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
+        if optimizer == "Adam":
+            opt.zero_grad()
+            loss, pen_value_ridge, \
+            pen_first_ridge, pen_second_ridge, \
+            pen_lambda_lasso = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
+            loss.backward()
+            opt.step()
+            scheduler.step()
+            current_loss = loss
+        elif optimizer == "LBFGS":
+            current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
         loss_list.append(current_loss.detach().numpy().item())
 
         if verbose:
@@ -146,13 +160,14 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
 
     return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso
 
-def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), lambda_penalty_params=False, learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True):
+def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), lambda_penalty_params=False, learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True,
+          optimizer='LBFGS'):
 
     if return_report:
         start = time.time()
         loss_list, number_iterations, \
         pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
-                                                                                        learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
+                                                                                        learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta, optimizer=optimizer) # Run training
         end = time.time()
 
         training_time = end - start
