@@ -33,6 +33,7 @@ def run_epithel_study(data_dims: int,
                       span_restriction: str = None,
                       degree_inverse: int = 0,
                       hyperparameter_tuning: bool = True,
+                      cross_validation_folds: int = False,
                       tune_precision_matrix_penalty: bool = False,
                       iterations_hyperparameter_tuning: int = 1500,
                       n_samples: int = 2000,
@@ -101,7 +102,8 @@ def run_epithel_study(data_dims: int,
                                         degree_transformations_list, degree_decorrelation_list,
                                             x_train = x_train,
                                             x_validate = x_validate,
-                                            tune_precision_matrix_penalty=tune_precision_matrix_penalty) #normalisation_layer_list
+                                            tune_precision_matrix_penalty=tune_precision_matrix_penalty,
+                                            cross_validation_folds=cross_validation_folds) #normalisation_layer_list
 
         fig_hyperparameter_tuning_cooordinate = optuna.visualization.plot_parallel_coordinate(results)
         fig_hyperparameter_tuning_contour = optuna.visualization.plot_contour(results)
@@ -173,6 +175,7 @@ def run_epithel_study(data_dims: int,
     mlflow.log_param(key="log_data", value=log_data)
     mlflow.log_param(key="num_decorr_layers", value=num_decorr_layers)
     mlflow.log_param(key="spline_transformation", value=spline_transformation)
+    mlflow.log_param(key="cross_validation_folds", value=cross_validation_folds)
 
     # Defining the model
     poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
@@ -361,6 +364,9 @@ def run_epithel_study(data_dims: int,
     mlflow.log_metric("log_likelihood_mvn_model_test", test_log_likelihood_mvn_model.sum())
 
     x_sample = False
+    if n_samples == "train_samples":
+        n_samples = len(y_train)
+
     y_sampled = nf_mctm.sample(n_samples=n_samples, covariate=x_sample)
     y_sampled = y_sampled.detach().numpy()
     fig_y_sampled = plot_densities(y_sampled,
@@ -401,7 +407,7 @@ if __name__ == "__main__":
             span_factor_inverse=0.2,
             span_restriction="reluler",
             iterations=25,
-            iterations_hyperparameter_tuning=25,
+            iterations_hyperparameter_tuning=10,
             iterations_inverse=1,
             learning_rate_list=[1.],
             patience_list=[10],
@@ -413,6 +419,7 @@ if __name__ == "__main__":
             degree_inverse=120,
             monotonically_increasing_inverse=True,
             hyperparameter_tuning=False,
+            cross_validation_folds=5,
             n_samples=5000,
             list_comprehension=False,
             num_decorr_layers=6)

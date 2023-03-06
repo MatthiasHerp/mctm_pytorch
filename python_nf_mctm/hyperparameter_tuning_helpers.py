@@ -25,6 +25,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           x_train: torch.Tensor = False,
                           x_validate: torch.Tensor = False,
                           tuning_mode="optuna",
+                          cross_validation_folds=False,
                           tune_precision_matrix_penalty=False):
                           #normalisation_layer_list: list):
     """
@@ -72,7 +73,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                                            pensecondridge_opt])
 
             if tune_precision_matrix_penalty == True:
-                lambda_penalty_params_opt = trial.suggest_float("lambda_penalty_params", 0.001, 10, log=True)
+                lambda_penalty_params_opt = trial.suggest_float("lambda_penalty_params", 0.000001, 1, log=True)
                 num_vars = y_train.size()[1]
                 lambda_penalty_params_opt = torch.tensor(lambda_penalty_params_opt).repeat(num_vars,num_vars) - torch.eye(num_vars,num_vars) * lambda_penalty_params_opt
             else:
@@ -87,29 +88,72 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
             else:
                 number_covariates = 1
 
-            nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
-                              input_max=y_train.max(0).values,
-                              polynomial_range=poly_range,
-                              number_variables=y_train.size()[1],
-                              spline_decorrelation=spline_decorrelation,
-                              degree_transformations=degree_transformations,
-                              degree_decorrelation=degree_decorrelation,
-                              number_covariates=number_covariates)
-            # normalisation_layer=normalisation_layer)
+            #Cross validation inspired by:
+            #https://stackoverflow.com/questions/63224426/how-can-i-cross-validate-by-pytorch-and-optuna
 
-            train(model=nf_mctm,
-                  train_data=y_train,
-                  train_covariates=x_train,
-                  penalty_params=penalty_params,
-                  lambda_penalty_params=lambda_penalty_params_opt,
-                  iterations=iterations,
-                  learning_rate=learning_rate,
-                  patience=patience,
-                  min_delta=min_delta,
-                  verbose=False,
-                  return_report=False)  # no need for reporting and metrics,plots etc.
+            if cross_validation_folds == False:
+                nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
+                                  input_max=y_train.max(0).values,
+                                  polynomial_range=poly_range,
+                                  number_variables=y_train.size()[1],
+                                  spline_decorrelation=spline_decorrelation,
+                                  degree_transformations=degree_transformations,
+                                  degree_decorrelation=degree_decorrelation,
+                                  number_covariates=number_covariates)
+                # normalisation_layer=normalisation_layer)
 
-            return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
+                train(model=nf_mctm,
+                      train_data=y_train,
+                      train_covariates=x_train,
+                      penalty_params=penalty_params,
+                      lambda_penalty_params=lambda_penalty_params_opt,
+                      iterations=iterations,
+                      learning_rate=learning_rate,
+                      patience=patience,
+                      min_delta=min_delta,
+                      verbose=False,
+                      return_report=False)  # no need for reporting and metrics,plots etc.
+
+                return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
+
+            else:
+                kf = KFold(n_splits=cross_validation_folds, shuffle=True)
+                log_likelihoods = []
+                for train_idx, val_idx in kf.split(np.arange(y_train.size()[0])):
+                    y_train_cv = y_train[train_idx, :]
+                    y_validate_cv = y_train[val_idx, :]
+
+                    if x_train is False:
+                        x_train_cv = False
+                        x_validate_cv = False
+                    else:
+                        x_train_cv = x_train[train_idx, :]
+                        x_validate_cv = x_train[val_idx, :]
+
+                    nf_mctm = NF_MCTM(input_min=y_train_cv.min(0).values,
+                                      input_max=y_train_cv.max(0).values,
+                                      polynomial_range=poly_range,
+                                      number_variables=y_train_cv.size()[1],
+                                      spline_decorrelation=spline_decorrelation,
+                                      degree_transformations=degree_transformations,
+                                      degree_decorrelation=degree_decorrelation,
+                                      number_covariates=number_covariates)
+                    # normalisation_layer=normalisation_layer)
+
+                    train(model=nf_mctm,
+                          train_data=y_train_cv,
+                          train_covariates=x_train_cv,
+                          penalty_params=penalty_params,
+                          lambda_penalty_params=lambda_penalty_params_opt,
+                          iterations=iterations,
+                          learning_rate=learning_rate,
+                          patience=patience,
+                          min_delta=min_delta,
+                          verbose=False,
+                          return_report=False)
+
+                    log_likelihoods.append(nf_mctm.log_likelihood(y_validate_cv, x_validate_cv).detach().numpy().sum())
+                return np.mean(log_likelihoods)
 
         # docs: https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html#optuna.samplers.TPESampler
         study = optuna.create_study(sampler=TPESampler(n_startup_trials=7,
