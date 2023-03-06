@@ -13,6 +13,17 @@ def x_in_intervall(x, i, t):
                        torch.FloatTensor([0.0]))
 
 def B(x, k, i, t):
+    """
+
+    :param x: observatioon vector
+    :param k: degree of the basis function
+    :param i:
+    :param t: knots vector
+    :return:
+    """
+    # added due to derivativ computation of Bspline
+    if k < 0:
+        return torch.FloatTensor([0.0])
     if k == 0:
        return x_in_intervall(x, i, t) #torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
     if t[i+k] == t[i]:
@@ -91,7 +102,7 @@ def Naive(x, t, c, p):
 
 from python_nf_mctm.bernstein_prediction import kron
 
-def Naive_Basis(x, polynomial_range, degree, span_factor):
+def Naive_Basis(x, polynomial_range, degree, span_factor,derivativ=0):
     order = 2
     p = order
     n = degree + 1
@@ -104,9 +115,14 @@ def Naive_Basis(x, polynomial_range, degree, span_factor):
 
 
     n = len(t) - p - 1 - 1
-    return torch.vstack([B(x, p, i, t) for i in range(n)]).T
+    if derivativ==0:
+        return torch.vstack([B(x, p, i, t) for i in range(n)]).T
+    elif derivativ==1:
+        return torch.vstack([p*(B(x, p-1, i, t)/(t[i+p]-t[i]) - B(x, p-1, i+1, t)/(t[i+p+1]-t[i+1])) for i in range(n)]).T
 
-def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False):
+
+
+def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=0):
     # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     if covariate is not False:
@@ -115,11 +131,11 @@ def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_fac
         multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)))
 
     for var_num in range(input.size(1)):
-        input_basis = Naive_Basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor)
+        input_basis = Naive_Basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ)
         if covariate is not False:
             #covariate are transformed between 0 and 1 before inputting into the model
             # dont take the derivativ w.r.t to the covariate when computing jacobian of the transformation
-            covariate_basis = Naive_Basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor)
+            covariate_basis = Naive_Basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=derivativ)
             basis = kron(input_basis, covariate_basis)
         else:
             basis = input_basis

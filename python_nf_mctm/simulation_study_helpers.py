@@ -88,6 +88,7 @@ def evaluate_latent_space(z):
 from itertools import combinations
 
 def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
+    #TODO: make it a grid of plots
 
     # Ensures that by default all points are in the plot and axis have the same span (not distortion, can see distribution clearly)
     if x_lim is None:
@@ -108,17 +109,22 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
         covariate_values = torch.unique(covariate)
 
     if num_combinations > 1 :
-        fig, axs = plt.subplots(nrows=numbers_covariates, ncols=num_combinations, figsize=(15,5),
-                                gridspec_kw={'wspace':0.01, 'hspace':0.0})
+        number_rows = int(np.ceil(num_combinations / 3))
+        number_cols = 3
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15,5*number_rows),
+                                gridspec_kw={'wspace':0.05, 'hspace':0.05})
         a=0
         for i, j in combinations(range(num_cols), 2):
             if i != j:
                 if covariate is False:
-                    sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[a])
+                    row = int(a // 3)  # Get the row index
+                    col = int(a % 3)  # Get the column index
+                    sns.scatterplot(x=data[:,j], y=data[:,i], alpha=0.6, color="k", ax=axs[row,col])
                     #TODO:  got ValueError: Contour levels must be increasing
                     # suggestion on whre it came from: https://stackoverflow.com/questions/62233779/valueerror-contour-levels-must-be-increasing-contour-plot-in-python
                     #sns.kdeplot(x=data[:, j], y=data[:, i], fill=True, alpha=0.9, ax=axs[a])
                 else:
+                    warnings.warn("multivariate and covariate combination not implemented as grid yet")
                     for c in range(numbers_covariates):
                         sub_data = data[covariate == covariate_values[c]]
                         sub_covariate = covariate[covariate == covariate_values[c]]
@@ -167,11 +173,15 @@ def plot_metric_scatter(data, metric, covariate=False, x_lim=None, y_lim=None, m
     num_combinations = int(num_cols * (num_cols - 1) / 2)
 
     if num_combinations > 1:
-        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15, 5),
-                                gridspec_kw={'wspace': 0.01, 'hspace': 0.0})
+        number_rows = int(np.ceil(num_combinations / 3))
+        number_cols = 3
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15, 5 * number_rows),
+                                gridspec_kw={'wspace': 0.05, 'hspace': 0.05})
         a = 0
         for i, j in combinations(range(num_cols), 2):
             if i != j:
+                row = int(a // 3)  # Get the row index
+                col = int(a % 3)  # Get the column index
                 if covariate is not False:
                     warnings.warn("Covariate is not supported for 3d data yet")
 
@@ -181,27 +191,27 @@ def plot_metric_scatter(data, metric, covariate=False, x_lim=None, y_lim=None, m
                 # palette from here:
                 # https: // seaborn.pydata.org / tutorial / color_palettes.html
                 if metric_type == "kl_divergence":
-                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric, ax=axs[a], palette='icefire')
+                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric, ax=axs[row,col], palette='icefire')
                 elif metric_type == "precision_matrix":
-                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric[:,i,j], hue_norm=norm, ax=axs[a], palette='icefire')
+                    sns.scatterplot(x=data[:, i], y=data[:, j], hue=metric[:,i,j], hue_norm=norm, ax=axs[row,col], palette='icefire')
 
                 # Create a scalar mappable to show the legend
                 # https://stackoverflow.com/questions/62884183/trying-to-add-a-colorbar-to-a-seaborn-scatterplot
                 sm = plt.cm.ScalarMappable(cmap="icefire", norm=norm)
                 sm.set_array([])
 
-                axs[a].set_xlim(x_lim)
-                axs[a].set_ylim(y_lim)
+                axs[row,col].set_xlim(x_lim)
+                axs[row,col].set_ylim(y_lim)
 
-                axs[a].set_xlabel("y_" + str(i))
-                axs[a].set_ylabel("y_" + str(j))
+                axs[row,col].set_xlabel("y_" + str(i))
+                axs[row,col].set_ylabel("y_" + str(j))
 
                 # Remove the legend and add a colorbar
-                axs[a].get_legend().remove()
+                axs[row,col].get_legend().remove()
 
                 a += 1
 
-        axs[num_combinations-1].figure.colorbar(sm)
+        axs[0,number_cols-1].figure.colorbar(sm)
 
     else:
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -237,20 +247,25 @@ def plot_metric_hist(metric, covariate=False):
     num_combinations = int(num_cols * (num_cols - 1) / 2)
 
     if num_combinations > 1:
-        fig, axs = plt.subplots(nrows=1, ncols=num_combinations, figsize=(15, 5),
-                                gridspec_kw={'wspace': 0.01, 'hspace': 0.0})
+        number_rows = int(np.ceil(num_combinations / 3))
+        number_cols = 3
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15, 5 * number_rows),
+                                gridspec_kw={'wspace': 0.05, 'hspace': 0.05})
         a = 0
         for i, j in combinations(range(num_cols), 2):
             if i != j:
+                row = int(a // 3)  # Get the row index
+                col = int(a % 3)  # Get the column index
+
                 if covariate is not False:
                     warnings.warn("Covariate is not supported for 3d data yet")
 
                 # palette from here:
                 # https: // seaborn.pydata.org / tutorial / color_palettes.html
-                sns.histplot(x=metric[:,i,j], ax=axs[a])
+                sns.histplot(x=metric[:,i,j], ax=axs[row, col])
 
-                axs[a].set_xlabel("y_" + str(i))
-                axs[a].set_ylabel("y_" + str(j))
+                axs[row, col].set_xlabel("y_" + str(i))
+                axs[row, col].set_ylabel("y_" + str(j))
 
                 a += 1
     else:
@@ -267,19 +282,30 @@ def plot_metric_hist(metric, covariate=False):
 
 def plot_splines(layer, y_train=None, covariate_exists=False):
 
-    num_splines = layer.params.size()[1]
+    #num_variables = layer.number_variables
+    #num_splines = int(num_variables * (num_variables-1) / 2)
+    #num_splines = layer.params.size()[1]
     #num_variables = layer.number_variables
 
     if layer.type == "transformation":
         poly_min = y_train.min(0).values
         poly_max = y_train.max(0).values
+
+        num_variables = layer.number_variables
+        num_splines = num_variables
+
     elif layer.type == "decorrelation":
         poly_min = layer.polynomial_range[0,:]
         poly_max = layer.polynomial_range[1,:]
 
+        num_variables = layer.number_variables
+        num_splines = int(num_variables * (num_variables - 1) / 2)
 
-    data_span_vec = torch.zeros((1000,num_splines), dtype=torch.float32)
-    for i in range(num_splines):
+        lower_tri_indices = np.tril_indices(num_splines, k=-1)
+        output_splines = torch.zeros((1000,num_splines))
+
+    data_span_vec = torch.zeros((1000,num_variables), dtype=torch.float32)
+    for i in range(num_variables):
         data_span_vec[:,i] = torch.linspace(poly_min[i],poly_max[i],1000)
 
     if layer.type == "transformation":
@@ -292,7 +318,8 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
                 data_span_vec_estimated = layer.forward(z_tilde, covariate=covariate_value,  inverse=True)
                 #data_span_vec_estimated = data_span_vec_estimated.detach().numpy()
 
-                for spline_num in range(num_splines):
+                # For the transformation layer the number of splines is equal to the number of variables
+                for spline_num in range(num_variables):
                     results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, spline_num],
                                     "y_estimated": data_span_vec_estimated.detach().numpy()[:, spline_num],
                                     "z_tilde": z_tilde.detach().numpy()[:, spline_num],
@@ -306,7 +333,8 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
             data_span_vec_estimated = layer.forward(z_tilde, covariate=False, inverse=True)
             # data_span_vec_estimated = data_span_vec_estimated.detach().numpy()
 
-            for spline_num in range(num_splines):
+            # For the transformation layer the number of splines is equal to the number of variables
+            for spline_num in range(num_variables):
                 results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, spline_num],
                                                        "y_estimated": data_span_vec_estimated.detach().numpy()[:,
                                                                       spline_num],
@@ -320,25 +348,31 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
         if covariate_exists is True:
             for cov_value in [0.0, 0.25, 0.5, 0.75, 1.0]:
                 covariate_value = torch.Tensor([cov_value]).repeat(100)
-                for spline_num in range(num_splines):
-                    z_tilde[:,spline_num] = bspline_prediction(layer.params[:, spline_num],
-                                       data_span_vec[:, spline_num],
+                for spline_num in range(num_splines): #TODO: need to make this work for 10D so I need for var_num and for covar .... and iteratively +1 for spline_num
+
+                    col_indices = lower_tri_indices[1][spline_num]
+
+                    output_splines[:,spline_num] = bspline_prediction(layer.params[:, spline_num],
+                                       data_span_vec[:, col_indices],
                                        degree=layer.degree,
                                        polynomial_range=layer.polynomial_range[:, 0], #assume same polly range across variables
                                        monotonically_increasing=False,
                                        derivativ=0,
                                        covariate=covariate_value,
                                        params_covariate=layer.params_covariate[:, 0]) # hardcoded for only one covariate
-                    results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, spline_num],
-                                                           "z_tilde": z_tilde.detach().numpy()[:, spline_num],
+                    results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, col_indices],
+                                                           "z_tilde": output_splines.detach().numpy()[:, spline_num],
                                                            "covariate": cov_value,
                                                            "spline_num": spline_num }), ignore_index=True)
         else:
             results = results.drop(("covariate"), axis=1)
 
             for spline_num in range(num_splines):
-                z_tilde[:, spline_num] = bspline_prediction(layer.params[:, spline_num],
-                                                            data_span_vec[:, spline_num],
+                #lower_tri_indices = np.tril_indices(num_splines, k=-1)
+                #row_indices = lower_tri_indices[0]
+                col_indices = lower_tri_indices[1][spline_num]
+                output_splines[:, spline_num] = bspline_prediction(layer.params[:, spline_num],
+                                                            data_span_vec[:, col_indices],
                                                             degree=layer.degree,
                                                             polynomial_range=layer.polynomial_range[:, 0],
                                                             # assume same polly range across variables
@@ -346,8 +380,8 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
                                                             derivativ=0,
                                                             covariate=False,
                                                             params_covariate=False)  # hardcoded for only one covariate
-                results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, spline_num],
-                                                       "z_tilde": z_tilde.detach().numpy()[:, spline_num],
+                results = results.append(pd.DataFrame({"y": data_span_vec.detach().numpy()[:, col_indices],
+                                                       "z_tilde": output_splines.detach().numpy()[:, spline_num],
                                                        "spline_num": spline_num}), ignore_index=True)
 
 
@@ -355,43 +389,46 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
     #z_tilde = z_tilde.detach().numpy()
 
     if num_splines > 1 :
-        fig, axs = plt.subplots(nrows=1, ncols=num_splines, figsize=(15,5),
-                                gridspec_kw={'wspace':0.01, 'hspace':0.0},sharey=False, sharex=False)#dont want to share all x (sharex) and y axis (sharey)
-        a=0
+        number_rows = int(np.ceil(num_splines/3))
+        number_cols = 3
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15,5*number_rows),
+                                gridspec_kw={'wspace':0.05, 'hspace':0.05},sharey=False, sharex=False)#dont want to share all x (sharex) and y axis (sharey)
+
         for spline_num in range(num_splines):
             subset_results = results[results["spline_num"]==spline_num]
+            row = int(spline_num // 3)  # Get the row index
+            col = int(spline_num % 3)  # Get the column index
             if covariate_exists is True:
-                sns.lineplot(x="y", y="z_tilde", hue="covariate", data=subset_results, ax = axs[a])
+                sns.lineplot(x="y", y="z_tilde", hue="covariate", data=subset_results, ax = axs[row, col])
                 if layer.type == "transformation":
-                    sns.lineplot(x="y", y="z_tilde_derivativ", hue="covariate", data=subset_results, ax=axs[a])
+                    sns.lineplot(x="y", y="z_tilde_derivativ", hue="covariate", data=subset_results, ax=axs[row, col])
                     sns.lineplot(x="y_estimated", y="z_tilde", hue="covariate", linestyle='--', data=subset_results,
-                                 ax=axs[a])
+                                 ax=axs[row, col])
             else:
-                sns.lineplot(x="y", y="z_tilde", data=subset_results, ax = axs[a])
+                sns.lineplot(x="y", y="z_tilde", data=subset_results, ax = axs[row, col])
                 if layer.type == "transformation":
-                    sns.lineplot(x="y", y="z_tilde_derivativ", data=subset_results, ax=axs[a])
+                    sns.lineplot(x="y", y="z_tilde_derivativ", data=subset_results, ax=axs[row, col])
                     sns.lineplot(x="y_estimated", y="z_tilde", linestyle='--', data=subset_results,
-                                 ax=axs[a])
+                                 ax=axs[row, col])
             #TODO: solve this issue, somehow the min() max() in the comment below does not span all possible values
             #if layer.type == "transformation":
             #    axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
             #elif layer.type == "decorrelation":
             #    axs[a].set_ylim(-2, 2)
             if layer.type == "transformation":
-                axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
-                axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
+                axs[row, col].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
+                axs[row, col].set_xlim(subset_results["y"].min(), subset_results["y"].max())
 
-                axs[a].set_xlabel("y_" + str(spline_num))
-                axs[a].set_ylabel("z_tilde" + str(spline_num))
+                axs[row, col].set_xlabel("y_" + str(spline_num))
+                axs[row, col].set_ylabel("z_tilde" + str(spline_num))
 
             elif layer.type == "decorrelation":
-                axs[a].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
-                axs[a].set_xlim(subset_results["y"].min(), subset_results["y"].max())
+                axs[row, col].set_ylim(subset_results["z_tilde"].min(), subset_results["z_tilde"].max())
+                axs[row, col].set_xlim(subset_results["y"].min(), subset_results["y"].max())
 
-                axs[a].set_xlabel("z_tilde")
-                axs[a].set_ylabel("lambda_" + str(spline_num))
+                axs[row, col].set_xlabel("z_tilde")
+                axs[row, col].set_ylabel("lambda_" + str(spline_num))
 
-            a+=1
 
         plt.subplots_adjust(wspace=0.05)
 

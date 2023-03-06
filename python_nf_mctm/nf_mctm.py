@@ -150,7 +150,8 @@ from python_nf_mctm.decorrelation_layer import Decorrelation
 #        return y
 
 class NF_MCTM(nn.Module):
-    def __init__(self, input_min, input_max, polynomial_range, number_variables, spline_decorrelation="bernstein",
+    def __init__(self, input_min, input_max, polynomial_range, number_variables,
+                 spline_transformation="bernstein", spline_decorrelation="bernstein",
                  degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction="None",
                  number_covariates=False, num_decorr_layers=3, list_comprehension=False): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
@@ -181,7 +182,7 @@ class NF_MCTM(nn.Module):
 
         self.transformation = Transformation(degree=self.degree_transformations, number_variables=self.number_variables,
                                  polynomial_range=polynomial_range_transformation, span_factor=self.span_factor,
-                                 number_covariates=self.number_covariates)
+                                 number_covariates=self.number_covariates, spline=spline_transformation)
         ##self.l12 = ReLULeR(polynomial_range_abs=self.polynomial_range[1])
         #self.l2 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables,
         #                        polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor,

@@ -37,8 +37,9 @@ def run_epithel_study(data_dims: int,
                       iterations_hyperparameter_tuning: int = 1500,
                       n_samples: int = 2000,
                       list_comprehension: bool = False,
-                      optimizer: str = "LBFGS"
-                      ):
+                      optimizer: str = "LBFGS",
+                      num_decorr_layers: int = 6,
+                      spline_transformation="bernstein"):
 
     covariate_exists=False
     number_covariates = 0
@@ -169,6 +170,9 @@ def run_epithel_study(data_dims: int,
     mlflow.log_param(key="covariate_exists", value=covariate_exists)
     mlflow.log_param(key="list_comprehension", value=list_comprehension)
     mlflow.log_param(key="optimizer", value=optimizer)
+    mlflow.log_param(key="log_data", value=log_data)
+    mlflow.log_param(key="num_decorr_layers", value=num_decorr_layers)
+    mlflow.log_param(key="spline_transformation", value=spline_transformation)
 
     # Defining the model
     poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
@@ -186,13 +190,15 @@ def run_epithel_study(data_dims: int,
                       input_max=y_train.max(0).values,
                       polynomial_range=poly_range,
                       number_variables=y_train.size()[1],
+                      spline_transformation=spline_transformation,
                       spline_decorrelation=spline_decorrelation,
                       degree_transformations=int(degree_transformations),
                       degree_decorrelation=int(degree_decorrelation),
                       span_factor=span_factor,
                       span_restriction=span_restriction,
                       number_covariates=number_covariates,
-                      list_comprehension=list_comprehension)
+                      list_comprehension=list_comprehension,
+                      num_decorr_layers=num_decorr_layers)
     # normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -209,170 +215,176 @@ def run_epithel_study(data_dims: int,
                                                           verbose=False,
                                                           optimizer=optimizer)
 
-    #
-#
-    ## Training the inverse of the model
-    #fig_training_inverse = nf_mctm.transformation.approximate_inverse(input=y_train,
-    #                                                      input_covariate=x_train,
-    #                                                      spline_inverse=spline_inverse,
-    #                                                      degree_inverse=degree_inverse,
-    #                                                      monotonically_increasing_inverse=monotonically_increasing_inverse,
-    #                                                      iterations=iterations_inverse,
-    #                                                      span_factor_inverse=span_factor_inverse,
-    #                                                      patience=20,
-    #                                                      global_min_loss=0.001)
-#
-    ##### Training Evaluation
-#
-    ##sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
-#
-    #fig_y_train = plot_densities(y_train, covariate=x_train, x_lim=[y_train.min(), y_train.max()],
-    #                             y_lim=[y_train.min(), y_train.max()])
-#
-    #fig_splines_transformation_layer = plot_splines(layer=nf_mctm.transformation, y_train=y_train,
-    #                                                  covariate_exists=covariate_exists)
-    #log_mlflow_plot(fig_splines_transformation_layer, 'plot_splines_transformation_layer.png')
-#
-    #for i in range(nf_mctm.number_decorrelation_layers):
-    #    fig_splines_decorrelation_layer = plot_splines(layer=nf_mctm.decorrelation_layers[i], y_train=y_train, covariate_exists=covariate_exists)
-    #    log_mlflow_plot(fig_splines_decorrelation_layer, 'plot_splines_decorrelation_layer_{}.png'.format(i))
-#
-    ##fig_splines_decorrelation_layer_2 = plot_splines(layer=nf_mctm.l2, covariate_exists=covariate_exists)
-    ##fig_splines_decorrelation_layer_4 = plot_splines(layer=nf_mctm.l4, covariate_exists=covariate_exists)
-    ##fig_splines_decorrelation_layer_6 = plot_splines(layer=nf_mctm.l6, covariate_exists=covariate_exists)
-#
-    ## Evaluate latent space of the model in training set
-    #z_train = nf_mctm.latent_space_representation(y_train, x_train).detach().numpy()
-    #res_normal_train, res_pval_train, z_mean_train, z_cov_train, p_train = evaluate_latent_space(z_train)
-    #fig_z_train = plot_densities(z_train, x_train)
-#
-    #predicted_train_log_likelihood = nf_mctm.log_likelihood(y_train, x_train)
-#
-    #precision_matrix_train = nf_mctm.compute_precision_matrix(y_train, x_train)
-    #fig_precision_matrix_nf_mctm_train = plot_metric_scatter(y_train, precision_matrix_train,
-    #                                                         metric_type="precision_matrix")
-    #fig_hist_precision_matrix_nf_mctm_train = plot_metric_hist(precision_matrix_train, covariate=False)
-#
-    ## estimate the Multivariate Normal Distribution as Model
-    #mean_mvn_model = y_train.mean(0)  # 0 to do mean across dim 0 not globally
-    #cov_mvn_model = y_train.T.cov()
-    #mvn_model = MultivariateNormal(loc=mean_mvn_model, covariance_matrix=cov_mvn_model)
-#
-    #train_log_likelihood_mvn_model = mvn_model.log_prob(y_train)
-#
-    ##### Test Evaluation
-#
-    #fig_y_test = plot_densities(y_test, covariate=x_test)
-#
-    ## Evaluate latent space of the model in test set
-    #z_test = nf_mctm.latent_space_representation(y_test, x_test).detach().numpy()
-    #res_normal_test, res_pval_test, z_mean_test, z_cov_test, p_test = evaluate_latent_space(z_test)
-    #fig_z_test = plot_densities(z_test)
-#
-    #predicted_test_log_likelihood = nf_mctm.log_likelihood(y_test, x_test)
-#
-    ## mvn Model on test data
-    #test_log_likelihood_mvn_model = mvn_model.log_prob(y_test)
-#
-    ##### Log Training Artifacts
-    #model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
-#
-    #log_mlflow_plot(fig_training, 'plot_training.png')
+
+
+    # Training the inverse of the model
+    fig_training_inverse = nf_mctm.transformation.approximate_inverse(input=y_train,
+                                                          input_covariate=x_train,
+                                                          spline_inverse=spline_inverse,
+                                                          degree_inverse=degree_inverse,
+                                                          monotonically_increasing_inverse=monotonically_increasing_inverse,
+                                                          iterations=iterations_inverse,
+                                                          span_factor_inverse=span_factor_inverse,
+                                                          patience=20,
+                                                          global_min_loss=0.001)
+
+    #### Training Evaluation
+
+    #sum_log_likelihood_val = nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
+
+    fig_y_train = plot_densities(y_train, covariate=x_train, x_lim=[y_train.min(), y_train.max()],
+                                 y_lim=[y_train.min(), y_train.max()])
+
+    fig_splines_transformation_layer = plot_splines(layer=nf_mctm.transformation, y_train=y_train,
+                                                      covariate_exists=covariate_exists)
+    log_mlflow_plot(fig_splines_transformation_layer, 'plot_splines_transformation_layer.png')
+
+    for i in range(nf_mctm.number_decorrelation_layers):
+        fig_splines_decorrelation_layer = plot_splines(layer=nf_mctm.decorrelation_layers[i], y_train=y_train, covariate_exists=covariate_exists)
+        log_mlflow_plot(fig_splines_decorrelation_layer, 'plot_splines_decorrelation_layer_{}.png'.format(i))
+
+    #fig_splines_decorrelation_layer_2 = plot_splines(layer=nf_mctm.l2, covariate_exists=covariate_exists)
+    #fig_splines_decorrelation_layer_4 = plot_splines(layer=nf_mctm.l4, covariate_exists=covariate_exists)
+    #fig_splines_decorrelation_layer_6 = plot_splines(layer=nf_mctm.l6, covariate_exists=covariate_exists)
+
+    # Evaluate latent space of the model in training set
+    z_train = nf_mctm.latent_space_representation(y_train, x_train).detach().numpy()
+    res_normal_train, res_pval_train, z_mean_train, z_cov_train, p_train = evaluate_latent_space(z_train)
+    fig_z_train = plot_densities(z_train, x_train)
+
+    predicted_train_log_likelihood = nf_mctm.log_likelihood(y_train, x_train)
+
+    precision_matrix_train = nf_mctm.compute_precision_matrix(y_train, x_train)
+    fig_precision_matrix_nf_mctm_train = plot_metric_scatter(y_train, precision_matrix_train,
+                                                             metric_type="precision_matrix")
+    fig_hist_precision_matrix_nf_mctm_train = plot_metric_hist(precision_matrix_train, covariate=False)
+
+    # estimate the Multivariate Normal Distribution as Model
+    mean_mvn_model = y_train.mean(0)  # 0 to do mean across dim 0 not globally
+    cov_mvn_model = y_train.T.cov()
+    mvn_model = MultivariateNormal(loc=mean_mvn_model, covariance_matrix=cov_mvn_model)
+
+    train_log_likelihood_mvn_model = mvn_model.log_prob(y_train)
+
+    #### Test Evaluation
+
+    fig_y_test = plot_densities(y_test, covariate=x_test)
+
+    # Evaluate latent space of the model in test set
+    z_test = nf_mctm.latent_space_representation(y_test, x_test).detach().numpy()
+    res_normal_test, res_pval_test, z_mean_test, z_cov_test, p_test = evaluate_latent_space(z_test)
+    fig_z_test = plot_densities(z_test)
+
+    predicted_test_log_likelihood = nf_mctm.log_likelihood(y_test, x_test)
+
+    # mvn Model on test data
+    test_log_likelihood_mvn_model = mvn_model.log_prob(y_test)
+
+    #### Log Training Artifacts
+    model_info = mlflow.pytorch.log_model(nf_mctm, "nf_mctm_model")
+
+    log_mlflow_plot(fig_training, 'plot_training.png')
     #log_mlflow_plot(fig_training_inverse, 'plot_training_inverse.png')
-#
-    ## fig_training.savefig('plot_training.png')
-    ## mlflow.log_artifact("./plot_training.png")
-    ## fig_training_inverse.savefig('plot_training_inverse.png')
-    ## mlflow.log_artifact("./plot_training_inverse.png")
-    #mlflow.log_metric("number_iterations", number_iterations)
-    #mlflow.log_metric("training_time", training_time)
-    ##mlflow.log_metric("sum_log_likelihood_validation", sum_log_likelihood_val)
-#
-    #mlflow.log_metric("pen_value_ridge_final", pen_value_ridge_final)
-    #mlflow.log_metric("pen_first_ridge_final", pen_first_ridge_final)
-    #mlflow.log_metric("pen_second_ridge_final", pen_second_ridge_final)
-#
-    #np.save("loss_training_iterations.npy", loss_training_iterations)
-    #mlflow.log_artifact("./loss_training_iterations.npy")
-#
-    ##log_mlflow_plot(fig_splines_transformation_layer_1, 'plot_splines_transformation_layer_1.png')
-    ##log_mlflow_plot(fig_splines_decorrelation_layer_2, 'plot_splines_decorrelation_layer_2.png')
-    ##log_mlflow_plot(fig_splines_decorrelation_layer_4, 'plot_splines_decorrelation_layer_4.png')
-    ##log_mlflow_plot(fig_splines_decorrelation_layer_6, 'plot_splines_decorrelation_layer_6.png')
-#
-    #log_mlflow_plot(fig_precision_matrix_nf_mctm_train, 'plot_precision_matrix_nf_mctm_train.png')
-    #log_mlflow_plot(fig_hist_precision_matrix_nf_mctm_train, 'plot_hist_precision_matrix_nf_mctm_train.png')
-#
-    ##### Log Train Data Metrics and Artifacts
-    #log_mlflow_plot(fig_y_train, 'plot_data_train.png')
-    ## fig_y_train.savefig('plot_data_train.png')
-    ## mlflow.log_artifact("./plot_data_train.png")
-#
-    #mlflow.log_metric("mv_normality_result_train", res_normal_train)
-    #mlflow.log_metric("mv_normality_pval_train", res_pval_train)
-#
-    #np.save("z_mean_train.npy", z_mean_train)
-    #mlflow.log_artifact("./z_mean_train.npy")
-#
-    #np.save("z_cov_train.npy", z_cov_train)
-    #mlflow.log_artifact("./z_cov_train.npy")
-#
-    #np.save("uv_normality_pvals_train.npy", p_train)
-    #mlflow.log_artifact("./uv_normality_pvals_train.npy")
-#
-    #log_mlflow_plot(fig_z_train, 'plot_latent_space_train.png')
-    ## fig_z_train.savefig('plot_latent_space_train.png')
-    ## mlflow.log_artifact("./plot_latent_space_train.png")
-#
-    #mlflow.log_metric("neg_log_likelihood_nf_mctm_train", predicted_train_log_likelihood.sum())
-    #mlflow.log_metric("neg_log_likelihood_mvn_model_train", train_log_likelihood_mvn_model.sum())
-#
-    ##### Log Test Data Metrics and Artifacts
-    #log_mlflow_plot(fig_y_test, 'plot_data_test.png')
-    ## fig_y_test.savefig('plot_data_test.png')
-    ## mlflow.log_artifact("./plot_data_test.png")
-#
-    #mlflow.log_metric("mv_normality_result_test", res_normal_test)
-    #mlflow.log_metric("mv_normality_pval_test", res_pval_test)
-#
-    #np.save("z_mean_test.npy", z_mean_test)
-    #mlflow.log_artifact("./z_mean_test.npy")
-#
-    #np.save("z_cov_test.npy", z_cov_test)
-    #mlflow.log_artifact("./z_cov_test.npy")
-#
-    #np.save("uv_normality_pvals_test.npy", p_test)
-    #mlflow.log_artifact("./uv_normality_pvals_test.npy")
-#
-    #log_mlflow_plot(fig_z_test, 'plot_latent_space_test.png')
-    ## fig_z_test.savefig('plot_latent_space_test.png')
-    ## mlflow.log_artifact("./plot_latent_space_test.png")
-#
-    #mlflow.log_metric("neg_log_likelihood_nf_mctm_test", predicted_test_log_likelihood.sum())
-    #mlflow.log_metric("neg_log_likelihood_mvn_model_test", test_log_likelihood_mvn_model.sum())
-#
-    #x_sample = False
-    #y_sampled = nf_mctm.sample(n_samples=n_samples, covariate=x_sample)
-    #y_sampled = y_sampled.detach().numpy()
-    #fig_y_sampled = plot_densities(y_sampled,
-    #                               covariate=x_sample)
-#
-    ##### Log Sampling Aritfacts
-    #np.save("synthetically_sampled_data.npy", y_sampled)
-    #mlflow.log_artifact("./synthetically_sampled_data.npy")
-#
-    #log_mlflow_plot(fig_y_sampled, 'plot_synthetically_sampled_data.png')
-#
-    # End the run
+
+    # fig_training.savefig('plot_training.png')
+    # mlflow.log_artifact("./plot_training.png")
+    # fig_training_inverse.savefig('plot_training_inverse.png')
+    # mlflow.log_artifact("./plot_training_inverse.png")
+    mlflow.log_metric("number_iterations", number_iterations)
+    mlflow.log_metric("training_time", training_time)
+    #mlflow.log_metric("sum_log_likelihood_validation", sum_log_likelihood_val)
+
+    mlflow.log_metric("pen_value_ridge_final", pen_value_ridge_final)
+    mlflow.log_metric("pen_first_ridge_final", pen_first_ridge_final)
+    mlflow.log_metric("pen_second_ridge_final", pen_second_ridge_final)
+
+    np.save("loss_training_iterations.npy", loss_training_iterations)
+    mlflow.log_artifact("./loss_training_iterations.npy")
+
+    #log_mlflow_plot(fig_splines_transformation_layer_1, 'plot_splines_transformation_layer_1.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_2, 'plot_splines_decorrelation_layer_2.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_4, 'plot_splines_decorrelation_layer_4.png')
+    #log_mlflow_plot(fig_splines_decorrelation_layer_6, 'plot_splines_decorrelation_layer_6.png')
+
+    log_mlflow_plot(fig_precision_matrix_nf_mctm_train, 'plot_precision_matrix_nf_mctm_train.png')
+    log_mlflow_plot(fig_hist_precision_matrix_nf_mctm_train, 'plot_hist_precision_matrix_nf_mctm_train.png')
+
+    np.save("precision_matrix_train.npy", precision_matrix_train)
+    mlflow.log_artifact("./precision_matrix_train.npy")
+
+    #### Log Train Data Metrics and Artifacts
+    log_mlflow_plot(fig_y_train, 'plot_data_train.png')
+    # fig_y_train.savefig('plot_data_train.png')
+    # mlflow.log_artifact("./plot_data_train.png")
+
+    mlflow.log_metric("mv_normality_result_train", res_normal_train)
+    mlflow.log_metric("mv_normality_pval_train", res_pval_train)
+
+    np.save("z_mean_train.npy", z_mean_train)
+    mlflow.log_artifact("./z_mean_train.npy")
+
+    np.save("z_cov_train.npy", z_cov_train)
+    mlflow.log_artifact("./z_cov_train.npy")
+
+    np.save("uv_normality_pvals_train.npy", p_train)
+    mlflow.log_artifact("./uv_normality_pvals_train.npy")
+
+    log_mlflow_plot(fig_z_train, 'plot_latent_space_train.png')
+    # fig_z_train.savefig('plot_latent_space_train.png')
+    # mlflow.log_artifact("./plot_latent_space_train.png")
+
+    mlflow.log_metric("log_likelihood_nf_mctm_train", predicted_train_log_likelihood.sum())
+    mlflow.log_metric("log_likelihood_mvn_model_train", train_log_likelihood_mvn_model.sum())
+
+    #### Log Test Data Metrics and Artifacts
+    log_mlflow_plot(fig_y_test, 'plot_data_test.png')
+    # fig_y_test.savefig('plot_data_test.png')
+    # mlflow.log_artifact("./plot_data_test.png")
+
+    mlflow.log_metric("mv_normality_result_test", res_normal_test)
+    mlflow.log_metric("mv_normality_pval_test", res_pval_test)
+
+    np.save("z_mean_test.npy", z_mean_test)
+    mlflow.log_artifact("./z_mean_test.npy")
+
+    np.save("z_cov_test.npy", z_cov_test)
+    mlflow.log_artifact("./z_cov_test.npy")
+
+    np.save("uv_normality_pvals_test.npy", p_test)
+    mlflow.log_artifact("./uv_normality_pvals_test.npy")
+
+    log_mlflow_plot(fig_z_test, 'plot_latent_space_test.png')
+    # fig_z_test.savefig('plot_latent_space_test.png')
+    # mlflow.log_artifact("./plot_latent_space_test.png")
+
+    mlflow.log_metric("log_likelihood_nf_mctm_test", predicted_test_log_likelihood.sum())
+    mlflow.log_metric("log_likelihood_mvn_model_test", test_log_likelihood_mvn_model.sum())
+
+    x_sample = False
+    y_sampled = nf_mctm.sample(n_samples=n_samples, covariate=x_sample)
+    y_sampled = y_sampled.detach().numpy()
+    fig_y_sampled = plot_densities(y_sampled,
+                                   covariate=x_sample)
+
+    #### Log Sampling Aritfacts
+    np.save("synthetically_sampled_data.npy", y_sampled)
+    mlflow.log_artifact("./synthetically_sampled_data.npy")
+
+    log_mlflow_plot(fig_y_sampled, 'plot_synthetically_sampled_data.png')
+
+    #End the run
     print("Finished Run")
     mlflow.end_run()
 
 
 if __name__ == "__main__":
 
+    #mlflow.create_experiment(name="ephithel_hyperpar_server")
+    experiment = mlflow.get_experiment_by_name("ephithel_hyperpar")
+
     run_epithel_study(
-            experiment_id =  868040026974936214,
-            data_dims=10,
+            experiment_id = experiment.experiment_id,
+            data_dims=4,
             train_portion=0.8,
             val_portion=0.3,
             log_data=False,
@@ -382,14 +394,15 @@ if __name__ == "__main__":
             penfirstridge_list=[0],
             pensecondridge_list=[0],
             poly_span_abs=15,
+            spline_transformation="bspline",
             spline_decorrelation="bspline",
-            spline_inverse="bernstein",
+            spline_inverse="bspline",
             span_factor=0.1,
             span_factor_inverse=0.2,
             span_restriction="reluler",
-            iterations=200,
-            iterations_hyperparameter_tuning=50,
-            iterations_inverse=40000,
+            iterations=25,
+            iterations_hyperparameter_tuning=25,
+            iterations_inverse=1,
             learning_rate_list=[1.],
             patience_list=[10],
             min_delta_list=[1e-8],
@@ -400,37 +413,40 @@ if __name__ == "__main__":
             degree_inverse=120,
             monotonically_increasing_inverse=True,
             hyperparameter_tuning=False,
-            n_samples=10000,
-            list_comprehension=False)
+            n_samples=5000,
+            list_comprehension=False,
+            num_decorr_layers=6)
 
-    run_epithel_study(
-        experiment_id=868040026974936214,
-        data_dims=3,
-        train_portion=0.8,
-        val_portion=0.3,
-        log_data=True,
-        # Setting Hyperparameter Values
-        seed_value=1,
-        penvalueridge_list=[0],
-        penfirstridge_list=[0],
-        pensecondridge_list=[0],
-        poly_span_abs=15,
-        spline_decorrelation="bspline",
-        spline_inverse="bernstein",
-        span_factor=0.1,
-        span_factor_inverse=0.2,
-        span_restriction="reluler",
-        iterations=200,
-        iterations_hyperparameter_tuning=50,
-        iterations_inverse=40000,
-        learning_rate_list=[1.],
-        patience_list=[10],
-        min_delta_list=[1e-8],
-        degree_transformations_list=[70],
-        degree_decorrelation_list=[40],
-        lambda_penalty_params_list=[False],
-        # normalisation_layer_list=[None],
-        degree_inverse=120,
-        monotonically_increasing_inverse=True,
-        hyperparameter_tuning=False,
-        n_samples=10000)
+    #run_epithel_study(
+    #    experiment_id= experiment.experiment_id,
+    #    data_dims=3,
+    #    train_portion=0.8,
+    #    val_portion=0.3,
+    #    log_data=True,
+    #    # Setting Hyperparameter Values
+    #    seed_value=1,
+    #    penvalueridge_list=[0],
+    #    penfirstridge_list=[0],
+    #    pensecondridge_list=[0],
+    #    poly_span_abs=15,
+    #    spline_decorrelation="bspline",
+    #    spline_inverse="bspline",
+    #    span_factor=0.1,
+    #    span_factor_inverse=0.2,
+    #    span_restriction="reluler",
+    #    iterations=10,
+    #    iterations_hyperparameter_tuning=10,
+    #    iterations_inverse=1,
+    #    learning_rate_list=[1.],
+    #    patience_list=[10],
+    #    min_delta_list=[1e-8],
+    #    degree_transformations_list=[70],
+    #    degree_decorrelation_list=[40],
+    #    lambda_penalty_params_list=[False],
+    #    # normalisation_layer_list=[None],
+    #    degree_inverse=120,
+    #    monotonically_increasing_inverse=True,
+    #    hyperparameter_tuning=True,
+    #    n_samples=10000,
+    #    list_comprehension=True,
+    #    num_decorr_layers=6)

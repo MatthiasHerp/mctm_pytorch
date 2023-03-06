@@ -83,9 +83,11 @@ class EarlyStopper:
             self.counter += 1
 
             if self.counter >= self.patience:
+                print("Early stopping due to no improvement in loss for",self.patience,"iterations")
                 return True
 
         if current_loss < self.global_min_loss:
+            print("Early stopping due to global minimum loss reached")
             return True
 
         return False
@@ -106,7 +108,7 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=0.01, optimizer='LBFGS'):
+def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=-np.inf, optimizer='LBFGS'):
     opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 

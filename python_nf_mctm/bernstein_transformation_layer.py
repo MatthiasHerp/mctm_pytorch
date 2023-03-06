@@ -15,7 +15,18 @@ from python_nf_mctm.splines_utils import adjust_ploynomial_range
 from python_nf_mctm.bspline_prediction import compute_multivariate_bspline_basis
 
 
-def compute_starting_values_berstein_polynomials(degree,min,max,number_variables,number_covariates=False):
+def compute_starting_values(degree, min, max, number_variables, number_covariates=False):
+    """
+    Computes Starting Values for tge Transformation layer as a line that ranges from the min to the max value of the range
+    of the following decorrelation layer.
+
+    :param degree: number of basis functions
+    :param min: min of the range
+    :param max: max of the range
+    :param number_variables: dimensionality of the data, e.g. how many starting value vectors are needed
+    :param number_covariates: number of covariates to include (only implemented for 1 for now)
+    :return: starting values tensor
+    """
     par_restricted_opt = torch.linspace(min,max,degree+1)
     par_unristricted = par_restricted_opt
     par_unristricted[1:] = torch.log(par_restricted_opt[1:] - par_restricted_opt[:-1])#torch.diff(par_restricted_opt[1:]))
@@ -47,11 +58,11 @@ class Transformation(nn.Module):
         self.polynomial_range = polynomial_range
         self.spline = spline
         # param dims: 0: basis, 1: variable
-        self.params = nn.Parameter(compute_starting_values_berstein_polynomials(degree,
-                                                                                polynomial_range[0,0],
-                                                                                polynomial_range[1,0],
-                                                                                self.number_variables,
-                                                                                number_covariates=number_covariates))
+        self.params = nn.Parameter(compute_starting_values(degree,
+                                                           polynomial_range[0,0],
+                                                           polynomial_range[1,0],
+                                                           self.number_variables,
+                                                           number_covariates=number_covariates))
 
         self.monotonically_increasing = monotonically_increasing
 
@@ -143,6 +154,9 @@ class Transformation(nn.Module):
         elif spline == "bspline":
             self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False)
 
+            #TODO: need to implement first derivativ basis of bsplines
+            self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=1)
+
     def compute_initial_parameters_transformation(self, input, covariate):
         """
         #### Does Not work see obsidean notes####
@@ -181,48 +195,62 @@ class Transformation(nn.Module):
 
 
 
-            #if covariate == False:
-            #res = np.linalg.lstsq(self.multivariate_bernstein_basis[:, :, i].detach().numpy(),
-            #                          z_true.detach().numpy(), rcond=None)
-            #else:
-            #    expl_variables = torch.vstack([y, covariate])
-            #    res = np.linalg.lstsq(self.multivariate_bernstein_basis[:, :, i].detach().numpy(),
-            #                          z_true.detach().numpy(), rcond=None)
-            #param_vec = torch.tensor(res[0])
-            #differences = torch.diff(param_vec)
-            #differences = torch.tensor([diff.item() if diff < 2 else 2 for diff in differences])
-            #log_differences =  torch.log(torch.tensor([diff.item() if 0 < diff else 0.001 for diff in differences]))
-
-            from scipy.optimize import minimize
-
-            def objective_function(params, multivariate_bernstein_basis, z_true):
-                #diff = np.diff(params)
-                #diff = np.mean([-diff_i if diff_i < 0 else 0 for diff_i in diff])
-                params_restricted = params
-                params_restricted[1:] = np.exp(params_restricted[1:])
-                params_restricted = np.matmul(np.tril(np.ones((params_restricted.shape[0], params_restricted.shape[0]))),
-                                              params_restricted)
-
-                preds = np.sum(multivariate_bernstein_basis * params_restricted,1)
-                #outside_bounds_pen = np.mean([1 if -15 < preds_i < 15 else 0 for preds_i in preds])
-
-                error = np.mean(np.sum(preds - z_true)) ** 2 #+ 1000000 * diff + 1000000 * outside_bounds_pen
-                return (error)
-
-            beta_init = np.array([1] * (self.multivariate_bernstein_basis.size()[1]))
-            result = minimize(objective_function, beta_init, args=(self.multivariate_bernstein_basis[:,:,i].numpy(), z_true.numpy()),
-                              method='BFGS', options={'maxiter': 500})
-
-            param_vec = torch.tensor(result["x"])
-            #differences = torch.diff(param_vec)
-            #differences = torch.tensor([diff.item() if diff > 0 else 0.001 for diff in differences])
-            #log_differences = torch.log(torch.diff(param_vec))
-
-            #param_vec = torch.cat([param_vec[0].unsqueeze(0),log_differences])
+            if covariate == False:
+                res = np.linalg.lstsq(self.multivariate_bernstein_basis[:, :, i].detach().numpy(),
+                                      z_true.detach().numpy(), rcond=None)
+            else:
+                expl_variables = torch.vstack([y, covariate])
+                res = np.linalg.lstsq(self.multivariate_bernstein_basis[:, :, i].detach().numpy(),
+                                      z_true.detach().numpy(), rcond=None)
+            param_vec = torch.tensor(res[0])
+            param_vec[0] = -15
+            param_vec[param_vec.size(0)-1] = 15
+            param_vec = torch.tensor([param.item() if param < 15 else 15 for param in param_vec])
+            param_vec = torch.tensor([param.item() if param > -15 else -15 for param in param_vec])
+            for j in range(1, param_vec.size(0)):
+                if param_vec[j] - param_vec[j-1] < 0.001:
+                    param_vec[j] = param_vec[j-1] + 0.001
+            #param_vec[1:] = torch.tensor([param_vec[i].item() if param_vec[i] - param_vec[i-1] > 0.001 else param_vec[i-1] + 0.001 for i in range(1,param_vec.size(0))])
+            differences = torch.diff(param_vec)
+            #differences = torch.tensor([diff.item() if diff < torch.log(torch.tensor([4.])).item() else torch.log(torch.tensor([4.])).item() for diff in differences])
+            #log_differences = torch.log(torch.tensor([diff.item() if 0 < diff else 0.001 for diff in differences]))
+            log_differences = torch.log(differences)
+            param_vec = torch.cat([param_vec[0].unsqueeze(0), log_differences])
 
             params_tensor[:, i] = param_vec.unsqueeze(0)
 
         self.params = nn.Parameter(params_tensor)
+
+            #from scipy.optimize import minimize
+#
+            #def objective_function(params, multivariate_bernstein_basis, z_true):
+            #    #diff = np.diff(params)
+            #    #diff = np.mean([-diff_i if diff_i < 0 else 0 for diff_i in diff])
+            #    params_restricted = params
+            #    params_restricted[1:] = np.exp(params_restricted[1:])
+            #    params_restricted = np.matmul(np.tril(np.ones((params_restricted.shape[0], params_restricted.shape[0]))),
+            #                                  params_restricted)
+#
+            #    preds = np.sum(multivariate_bernstein_basis * params_restricted,1)
+            #    #outside_bounds_pen = np.mean([1 if -15 < preds_i < 15 else 0 for preds_i in preds])
+#
+            #    error = np.mean(np.sum(preds - z_true)) ** 2 #+ 1000000 * diff + 1000000 * outside_bounds_pen
+            #    return (error)
+#
+            #beta_init = np.array([1] * (self.multivariate_bernstein_basis.size()[1]))
+            #result = minimize(objective_function, beta_init, args=(self.multivariate_bernstein_basis[:,:,i].numpy(), z_true.numpy()),
+            #                  method='BFGS', options={'maxiter': 500})
+#
+            #param_vec = torch.tensor(result["x"])
+            ##differences = torch.diff(param_vec)
+            ##differences = torch.tensor([diff.item() if diff > 0 else 0.001 for diff in differences])
+            ##log_differences = torch.log(torch.diff(param_vec))
+
+            ##param_vec = torch.cat([param_vec[0].unsqueeze(0),log_differences])
+
+            #params_tensor[:, i] = param_vec.unsqueeze(0)
+
+        #self.params = nn.Parameter(params_tensor)
 
     def transformation(self, input, derivativ=0, inverse=False):
         # FunFact:
@@ -315,7 +343,7 @@ class Transformation(nn.Module):
         # optimization using linespace data and the forward berstein polynomial?
 
         if input_covariate is not False:
-            covariate_space = input_covariate[input_covariate.multinomial(10000, replacement=True)]
+            covariate_space = input_covariate[input_covariate.multinomial(100000, replacement=True)]
 
         if degree_inverse == 0:
             degree_inverse = 2 * self.degree

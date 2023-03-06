@@ -13,6 +13,8 @@ def compute_starting_values_bspline(degree,num_lambdas):
     else:
         params = nn.Parameter(torch.reshape(p, (degree + 1, int(num_lambdas))))
 
+    #params = (torch.rand((int(degree + 1), int(num_lambdas))) - 0.5) / 10
+
     return params
 
 def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction="None",
@@ -123,10 +125,11 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                     #first_order_ridge_pen_sum += first_order_ridge_pen_current
                     #param_ridge_pen_sum += param_ridge_pen_current
 
-                    lambda_matrix[:, var_num, covar_num] = lambda_value
+                    #lambda_matrix[:, var_num, covar_num] = lambda_value
 
                 return input[:, covar_num] * lambda_value, \
-                       second_order_ridge_pen_current, first_order_ridge_pen_current, param_ridge_pen_current
+                       second_order_ridge_pen_current, first_order_ridge_pen_current, param_ridge_pen_current,\
+                       lambda_value
 
             def forward_pass_col(var_num):
 
@@ -141,10 +144,13 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                     first_order_ridge_pen_row_sum = sum(res[covar_num][2] for covar_num in range(var_num))
                     param_ridge_pen_row_sum = sum(res[covar_num][3] for covar_num in range(var_num))
 
+                    lambda_matrix_entries = torch.cat([res[covar_num][4].unsqueeze(0) for covar_num in range(var_num)])
+
                     #lambda_value = sum(res[covar_num][4] for covar_num in range(var_num))
 
                     return add_to_output, \
-                              second_order_ridge_pen_row_sum, first_order_ridge_pen_row_sum, param_ridge_pen_row_sum
+                              second_order_ridge_pen_row_sum, first_order_ridge_pen_row_sum, param_ridge_pen_row_sum, \
+                           lambda_matrix_entries
 
             res = [forward_pass_col(var_num) for var_num in range(number_variables)]
 
@@ -153,6 +159,9 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
             second_order_ridge_pen_sum = sum(res[var_num][1] for var_num in range(number_variables))
             first_order_ridge_pen_sum = sum(res[var_num][2] for var_num in range(number_variables))
             param_ridge_pen_sum = sum(res[var_num][3] for var_num in range(number_variables))
+
+            for var_num in range(1,number_variables): #1 because the first row has no precision matrix entries
+                lambda_matrix[:,var_num,0:var_num] = res[var_num][4].T
 
             # update
         #output[:, var_num] = output[:, var_num] + lambda_value * input[:, covar_num]

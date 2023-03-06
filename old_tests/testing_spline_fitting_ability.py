@@ -1,4 +1,4 @@
-from python_nf_mctm.bernstein_transformation_layer import bernstein_prediction, compute_starting_values_berstein_polynomials
+from python_nf_mctm.bernstein_transformation_layer import bernstein_prediction, compute_starting_values
 import torch
 import torch.nn as nn
 from python_nf_mctm.training_helpers import EarlyStopper
@@ -13,10 +13,10 @@ if __name__ == "__main__":
     y_true = torch.linspace(-5, 5, 100)
     polynomial_range = torch.tensor([-5,5])
     degree=10
-    params = compute_starting_values_berstein_polynomials(degree,
-                                                 polynomial_range[0],
-                                                 polynomial_range[1],
-                                                 1)
+    params = compute_starting_values(degree,
+                                     polynomial_range[0],
+                                     polynomial_range[1],
+                                     1)
     z_true,a,b,c = bernstein_prediction(params.flatten(),
                                   y_true,
                                   degree,
