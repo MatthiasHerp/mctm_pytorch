@@ -41,6 +41,7 @@ def run_simulation_study(
         degree_transformations_list: list,
         degree_decorrelation_list: list,
         #normalisation_layer_list: list,
+        spline_transformation: str = "bernstein",
         lambda_penalty_params_list: list = False,
         monotonically_increasing_inverse: bool = True,
         span_factor: float = 0.1,
@@ -51,7 +52,8 @@ def run_simulation_study(
         tune_precision_matrix_penalty: bool = False,
         iterations_hyperparameter_tuning: int = 1500,
         n_samples: int = 2000,
-        num_decorr_layers: int = 3):
+        num_decorr_layers: int = 3,
+        list_comprehension: bool =False):
 
     #TODO: harmonize the covariate arguement (have number_covariates, covariate_exists, covariate, also = False etc..)
 
@@ -182,6 +184,8 @@ def run_simulation_study(
     mlflow.log_param(key="spline_inverse", value=spline_inverse)
     mlflow.log_param(key="iterations_hyperparameter_tuning", value=iterations_hyperparameter_tuning)
     mlflow.log_param(key="covariate_exists", value=covariate_exists)
+    mlflow.log_param(key="list_comprehension", value=list_comprehension)
+    mlflow.log_param(key="spline_transformation", value=spline_transformation)
     #mlflow.log_param(key="normalisation_layer", value=normalisation_layer)
 
     # Defining the model
@@ -197,13 +201,15 @@ def run_simulation_study(
                       input_max=y_train.max(0).values,
                       polynomial_range=poly_range,
                       number_variables=y_train.size()[1],
+                      spline_transformation=spline_transformation,
                       spline_decorrelation=spline_decorrelation,
                       degree_transformations=int(degree_transformations),
                       degree_decorrelation=int(degree_decorrelation),
                       span_factor = span_factor,
                       span_restriction = span_restriction,
                       number_covariates=number_covariates,
-                      num_decorr_layers=num_decorr_layers)
+                      num_decorr_layers=num_decorr_layers,
+                      list_comprehension=list_comprehension)
                       #normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -484,10 +490,10 @@ if __name__ == '__main__':
 
     print(os.getcwd())
     #mlflow.create_experiment(name="server_test")
-    experiment = mlflow.get_experiment_by_name("server_test")
+    #experiment = mlflow.get_experiment_by_name("server_test")
 
     run_simulation_study(
-        experiment_id = experiment.experiment_id, #464499768340700910,
+        experiment_id = 464499768340700910, #464499768340700910,
         copula = "t",
         copula_par = 3,
         train_obs = 2000,
@@ -498,12 +504,13 @@ if __name__ == '__main__':
         penfirstridge_list=[0.0011905053869227847],
         pensecondridge_list=[1.0482049179893074],
         poly_span_abs=15,
+        spline_transformation="bspline",
         spline_decorrelation="bspline",
         spline_inverse="bspline",
         span_factor=0.1,
         span_factor_inverse=0.2,
         span_restriction="reluler",
-        iterations=100,
+        iterations=10000,
         iterations_hyperparameter_tuning=5000,
         iterations_inverse=5000,
         learning_rate_list=[1.], #TODO: irrelevant as we use line search for the learning rate
@@ -518,6 +525,7 @@ if __name__ == '__main__':
         hyperparameter_tuning=False,
         tune_precision_matrix_penalty=False,
         n_samples=5000,
-        num_decorr_layers=5)
+        num_decorr_layers=5,
+        list_comprehension=True)
     #TODO: stop the plots all from showing plots
 

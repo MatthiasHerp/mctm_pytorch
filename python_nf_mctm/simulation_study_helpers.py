@@ -111,7 +111,8 @@ def plot_densities(data,covariate=False,x_lim=None,y_lim=None):
     if num_combinations > 1 :
         number_rows = int(np.ceil(num_combinations / 3))
         number_cols = 3
-        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15,5*number_rows),
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, squeeze=False,
+                                figsize=(15,5*number_rows),
                                 gridspec_kw={'wspace':0.05, 'hspace':0.05})
         a=0
         for i, j in combinations(range(num_cols), 2):
@@ -175,7 +176,8 @@ def plot_metric_scatter(data, metric, covariate=False, x_lim=None, y_lim=None, m
     if num_combinations > 1:
         number_rows = int(np.ceil(num_combinations / 3))
         number_cols = 3
-        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15, 5 * number_rows),
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, squeeze=False,
+                                figsize=(15, 5 * number_rows),
                                 gridspec_kw={'wspace': 0.05, 'hspace': 0.05})
         a = 0
         for i, j in combinations(range(num_cols), 2):
@@ -249,7 +251,8 @@ def plot_metric_hist(metric, covariate=False):
     if num_combinations > 1:
         number_rows = int(np.ceil(num_combinations / 3))
         number_cols = 3
-        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15, 5 * number_rows),
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, squeeze=False,
+                   figsize=(15, 5 * number_rows),
                                 gridspec_kw={'wspace': 0.05, 'hspace': 0.05})
         a = 0
         for i, j in combinations(range(num_cols), 2):
@@ -391,7 +394,8 @@ def plot_splines(layer, y_train=None, covariate_exists=False):
     if num_splines > 1 :
         number_rows = int(np.ceil(num_splines/3))
         number_cols = 3
-        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, figsize=(15,5*number_rows),
+        fig, axs = plt.subplots(nrows=number_rows, ncols=number_cols, squeeze=False,
+                                figsize=(15,5*number_rows),
                                 gridspec_kw={'wspace':0.05, 'hspace':0.05},sharey=False, sharex=False)#dont want to share all x (sharex) and y axis (sharey)
 
         for spline_num in range(num_splines):

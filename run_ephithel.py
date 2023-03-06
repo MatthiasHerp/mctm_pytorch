@@ -390,7 +390,7 @@ if __name__ == "__main__":
 
     run_epithel_study(
             experiment_id = experiment.experiment_id,
-            data_dims=4,
+            data_dims=3,
             train_portion=0.8,
             val_portion=0.3,
             log_data=False,
@@ -406,8 +406,8 @@ if __name__ == "__main__":
             span_factor=0.1,
             span_factor_inverse=0.2,
             span_restriction="reluler",
-            iterations=25,
-            iterations_hyperparameter_tuning=10,
+            iterations=10000,
+            iterations_hyperparameter_tuning=10000,
             iterations_inverse=1,
             learning_rate_list=[1.],
             patience_list=[10],
@@ -419,8 +419,8 @@ if __name__ == "__main__":
             degree_inverse=120,
             monotonically_increasing_inverse=True,
             hyperparameter_tuning=False,
-            cross_validation_folds=5,
-            n_samples=5000,
+            cross_validation_folds=False,
+            n_samples=8000,
             list_comprehension=False,
             num_decorr_layers=6)
 
