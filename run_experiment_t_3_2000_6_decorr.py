@@ -1,24 +1,19 @@
 import mlflow
 from run_simulation_study import run_simulation_study
 import torch
+import multiprocessing as multi
 
-if __name__ == "__main__":
 
-    #mlflow.create_experiment(name="t_3_2000")
-    experiment = mlflow.get_experiment_by_name("t_3_2000_6_decorr")
-
-    #source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
-    torch.set_num_interop_threads(50)  # Inter-op parallelism
-    torch.set_num_threads(50)  # Intra-op parallelism
-
-    for seed in range(1,51):
+def run_one_seed(seed, sema):
+        # mlflow.create_experiment(name="t_3_2000")
+        experiment = mlflow.get_experiment_by_name("t_3_2000_6_decorr")
 
         run_simulation_study(
-                experiment_id = experiment.experiment_id,
-                copula = "t",
-                copula_par = 3,
+                experiment_id=experiment.experiment_id,
+                copula="t",
+                copula_par=3,
                 covariate_exists=False,
-                train_obs = 2000,
+                train_obs=2000,
                 # Setting Hyperparameter Values
                 seed_value=seed,
                 penvalueridge_list=[0],
@@ -39,9 +34,31 @@ if __name__ == "__main__":
                 degree_transformations_list=[30],
                 degree_decorrelation_list=[40],
                 lambda_penalty_params_list=[False],
-                #normalisation_layer_list=[None],
+                # normalisation_layer_list=[None],
                 degree_inverse=150,
                 monotonically_increasing_inverse=True,
                 hyperparameter_tuning=True,
                 n_samples=2000,
                 num_decorr_layers=6)
+
+if __name__ == "__main__":
+
+    #mlflow.create_experiment(name="t_3_2000_6_decorr")
+    #experiment = mlflow.get_experiment_by_name("t_3_2000_6_decorr")
+
+    #source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
+    #torch.set_num_interop_threads(50)  # Inter-op parallelism
+    #torch.set_num_threads(50)  # Intra-op parallelism
+
+    total_num_threads = 10
+    sema= multi.Semaphore(total_num_threads)
+
+    jobs = []
+    for seed in range(1,51):
+            sema.acquire()
+            p = multi.Process(target=run_one_seed, args=(seed, sema))
+            jobs.append(p)
+            p.start()
+
+    for j in jobs:
+            j.join()

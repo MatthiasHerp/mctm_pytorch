@@ -4,14 +4,14 @@ import torch
 
 if __name__ == "__main__":
 
-    mlflow.create_experiment(name="frank_3_500")
+    #mlflow.create_experiment(name="frank_3_500")
     experiment = mlflow.get_experiment_by_name("frank_3_500")
 
     #source: https://discuss.pytorch.org/t/how-to-use-multi-cpu-or-muti-cpu-core-to-train/147124
     #torch.set_num_interop_threads(50)  # Inter-op parallelism
     #torch.set_num_threads(50)  # Intra-op parallelism
 
-    for seed_num in range(1,21):
+    for seed_num in range(21,51):
 
         run_simulation_study(
                 experiment_id = experiment.experiment_id,

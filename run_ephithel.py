@@ -385,7 +385,7 @@ def run_epithel_study(data_dims: int,
 
 if __name__ == "__main__":
 
-    #mlflow.create_experiment(name="ephithel_hyperpar_server")
+    #mlflow.create_experiment(name="ephithel_hyperpar_server2")
     experiment = mlflow.get_experiment_by_name("ephithel_hyperpar")
 
     run_epithel_study(
@@ -418,8 +418,8 @@ if __name__ == "__main__":
             #normalisation_layer_list=[None],
             degree_inverse=120,
             monotonically_increasing_inverse=True,
-            hyperparameter_tuning=False,
-            cross_validation_folds=False,
+            hyperparameter_tuning=True,
+            cross_validation_folds=5,
             n_samples=8000,
             list_comprehension=False,
             num_decorr_layers=6)

@@ -11,7 +11,7 @@ if __name__ == "__main__":
     #torch.set_num_interop_threads(50)  # Inter-op parallelism
     #torch.set_num_threads(50)  # Intra-op parallelism
 
-    for seed_num in range(11,21):
+    for seed_num in range(21,51):
 
         run_simulation_study(
                 experiment_id = experiment.experiment_id,
@@ -38,6 +38,7 @@ if __name__ == "__main__":
                 min_delta_list=[1e-8],
                 degree_transformations_list=[15],
                 degree_decorrelation_list=[40],
+                lambda_penalty_params_list=[False],
                 #normalisation_layer_list=[None],
                 degree_inverse=40,
                 monotonically_increasing_inverse=True,
