@@ -154,7 +154,7 @@ class NF_MCTM(nn.Module):
                  spline_transformation="bernstein", spline_decorrelation="bernstein",
                  degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction="None",
                  number_covariates=False, num_decorr_layers=3, list_comprehension=False,
-                 dev=dev): #normalisation_layer=None
+                 dev=False): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
