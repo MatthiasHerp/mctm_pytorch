@@ -50,7 +50,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 
 class Transformation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range, monotonically_increasing=True, spline="bernstein", span_factor=0.1,
-                 number_covariates=False):
+                 number_covariates=False, dev=False):
         super().__init__()
         self.type = "transformation"
         self.degree  = degree
@@ -72,6 +72,8 @@ class Transformation(nn.Module):
         self.multivariate_bernstein_basis_derivativ_1 = False
 
         self.number_covariates = number_covariates
+
+        self.dev = dev
 
         #self.span_factor_inverse = False
         #self.polynomial_range_inverse = False
@@ -143,14 +145,16 @@ class Transformation(nn.Module):
                                                                                      polynomial_range=polynomial_range,
                                                                                      span_factor=span_factor,
                                                                                      derivativ=0,
-                                                                                     covariate=covariate)
+                                                                                     covariate=covariate,
+                                                                                     dev=self.dev)
 
             self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bernstein_basis(input=input,
                                                                                                  degree=degree,
                                                                                                  polynomial_range=polynomial_range,
                                                                                                  span_factor=span_factor,
                                                                                                  derivativ=1,
-                                                                                                 covariate=covariate)
+                                                                                                 covariate=covariate,
+                                                                                                 dev=self.dev)
         elif spline == "bspline":
             self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False)
 
@@ -173,10 +177,16 @@ class Transformation(nn.Module):
         else:
             params_tensor = torch.zeros((self.degree+1 + self.number_covariates*(self.degree+1), self.number_variables))
 
+        if self.dev is not False:
+            params_tensor.to(self.dev)
+
         num_variables = input.size(1)
         for i in range(num_variables):
             y = input[:, i]
             z_true = torch.distributions.Normal(loc=0, scale=1).icdf(torch.tensor(ECDF(y)(y)) - 0.0001)
+
+            if self.dev is not False:
+                z_true.to(self.dev)
 
             #plt.hist(z_true)
             #plt.show()
@@ -203,10 +213,22 @@ class Transformation(nn.Module):
                 res = np.linalg.lstsq(self.multivariate_bernstein_basis[:, :, i].detach().numpy(),
                                       z_true.detach().numpy(), rcond=None)
             param_vec = torch.tensor(res[0])
+
+            if self.dev is not False:
+                param_vec.to(self.dev)
+
             param_vec[0] = -15
             param_vec[param_vec.size(0)-1] = 15
             param_vec = torch.tensor([param.item() if param < 15 else 15 for param in param_vec])
+
+            if self.dev is not False:
+                param_vec.to(self.dev)
+
             param_vec = torch.tensor([param.item() if param > -15 else -15 for param in param_vec])
+
+            if self.dev is not False:
+                param_vec.to(self.dev)
+
             for j in range(1, param_vec.size(0)):
                 if param_vec[j] - param_vec[j-1] < 0.001:
                     param_vec[j] = param_vec[j-1] + 0.001
@@ -258,7 +280,7 @@ class Transformation(nn.Module):
 
         # input dims: 0: observation number, 1: variable
         # cloning tipp from here: https://discuss.pytorch.org/t/encounter-the-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/836/10
-        output = input.clone()
+        #output = input.clone()
 
         #second_order_ridge_pen_sum = 0
         #first_order_ridge_pen_sum = 0
@@ -358,6 +380,9 @@ class Transformation(nn.Module):
         for var_number in range(self.number_variables):
             input_space[:, var_number] = torch.linspace(input[:,var_number].min(),input[:,var_number].max(),100000)
 
+        if self.dev is not False:
+            input_space.to(self.dev)
+
         #input_space = torch.vstack([torch.linspace(input[:,0].min(),input[:,0].max(),10000),
         #                            torch.linspace(input[:,1].min(),input[:,1].max(),10000)]).T
 
@@ -367,10 +392,17 @@ class Transformation(nn.Module):
             output_space = self.forward(input_space)
 
         polynomial_range_inverse = torch.zeros((2, self.number_variables), dtype=torch.float32)
+
+        if self.dev is not False:
+            polynomial_range_inverse.to(self.dev)
+
         for var_number in range(self.number_variables):
             span_var_number = output_space[:, var_number].max() - output_space[:, var_number].min()
             polynomial_range_inverse[:, var_number] = torch.tensor([output_space[:, var_number].min() - span_var_number*span_factor_inverse,
                                                                     output_space[:, var_number].max() + span_var_number*span_factor_inverse], dtype=torch.float32)
+
+            if self.dev is not False:
+                polynomial_range_inverse.to(self.dev)
 
         #span_0 = output_space[:, 0].max() - output_space[:, 0].min()
         #span_1 = output_space[:, 1].max() - output_space[:, 1].min()

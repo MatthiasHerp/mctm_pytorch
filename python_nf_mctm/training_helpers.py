@@ -10,6 +10,7 @@ from torch import optim
 from tqdm import tqdm
 import seaborn as sns
 from pytorch_lbfgs.LBFGS import LBFGS, FullBatchLBFGS
+import copy
 
 def objective(y, model, penalty_params, lambda_penalty_params: torch.Tensor =False, train_covariates=False, avg = True):
     #TODO: take the outputted lambda matrix and penalize it based on an additional lasso precision matrix pen matrix
@@ -73,13 +74,19 @@ class EarlyStopper:
         self.global_min_loss = global_min_loss
 
     def early_stop(self, current_loss, model):
-        if current_loss < self.min_loss:
+        #print(self.counter)
+        #if current_loss < self.min_loss:
             #print("current loss:",current_loss," smaller than min_loss:",self.min_loss)
+            #self.best_model_state = copy.deepcopy(model.state_dict())
+            #self.min_loss = current_loss
+            #self.counter = 0
+
+        if current_loss < self.min_loss - self.min_delta:
             self.best_model_state = copy.deepcopy(model.state_dict())
             self.min_loss = current_loss
             self.counter = 0
 
-        elif np.allclose(current_loss,self.min_loss,self.min_delta):
+        else:
             self.counter += 1
 
             if self.counter >= self.patience:
@@ -108,7 +115,7 @@ class EarlyStopper:
 #
 #    return neg_log_likelihoods
 
-def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=-np.inf, optimizer='LBFGS'):
+def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penalty_params=False, train_covariates=False, validate_covariates=False, learning_rate=1, iterations = 2000, verbose=False, patience=5, min_delta=1e-7, global_min_loss=-np.inf, optimizer='LBFGS'):
     opt = FullBatchLBFGS(model.parameters(), lr=learning_rate, history_size=1, line_search='Wolfe')
     #opt = torch.optim.LBFGS(model.parameters(), lr=learning_rate, history_size=1) # no history basically, now the model trains stable, seems simple fischer scoring is enough
 
@@ -116,7 +123,7 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
         opt.zero_grad()
         loss, pen_value_ridge, \
         pen_first_ridge, pen_second_ridge, \
-        pen_lambda_lasso  = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates) # use the `objective` function
+        pen_lambda_lasso  = objective(y_train, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates) # use the `objective` function
         #loss.backward() # backpropagate the loss
         return loss
 
@@ -127,8 +134,8 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
     options = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
 
     if optimizer == "Adam":
-        opt = optim.Adam(model.parameters(), lr = learning_rate, weight_decay=0.1)
-        scheduler = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.5)
+        opt = optim.Adam(model.parameters(), lr = learning_rate, weight_decay=0)
+        scheduler = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.8)
 
     loss_list = []
     for i in tqdm(range(iterations)):
@@ -138,7 +145,7 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
             opt.zero_grad()
             loss, pen_value_ridge, \
             pen_first_ridge, pen_second_ridge, \
-            pen_lambda_lasso = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
+            pen_lambda_lasso = objective(y_train, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
             loss.backward()
             opt.step()
             scheduler.step()
@@ -146,6 +153,9 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
         elif optimizer == "LBFGS":
             current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
         loss_list.append(current_loss.detach().numpy().item())
+
+        #model_val = copy.deepcopy(model)
+        #current_neg_log_likl_validation = -1*sum(model_val.log_likelihood(y_validate, covariate=validate_covariates))
 
         if verbose:
             print("Loss:",current_loss.item())
@@ -158,17 +168,17 @@ def optimize(y, model, objective, penalty_params, lambda_penalty_params=False, t
     model.load_state_dict(early_stopper.best_model_state)
 
     # Rerun model at the end to get final penalties
-    _, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = objective(y, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
+    _, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = objective(y_train, model, penalty_params, lambda_penalty_params=lambda_penalty_params, train_covariates=train_covariates)
 
     return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso
 
-def train(model, train_data, train_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), lambda_penalty_params=False, learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True,
+def train(model, train_data, validate_data, train_covariates=False, validate_covariates=False, penalty_params=torch.FloatTensor([0,0,0]), lambda_penalty_params=False, learning_rate=1, iterations=2000, verbose=True, patience=5, min_delta=1e-7, return_report=True,
           optimizer='LBFGS'):
 
     if return_report:
         start = time.time()
         loss_list, number_iterations, \
-        pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
+        pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, validate_data, model, objective, train_covariates=train_covariates, validate_covariates=validate_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
                                                                                         learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta, optimizer=optimizer) # Run training
         end = time.time()
 
@@ -183,7 +193,7 @@ def train(model, train_data, train_covariates=False, penalty_params=torch.FloatT
         return loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso, training_time, fig
 
     else:
-        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
+        loss_list, number_iterations, pen_value_ridge, pen_first_ridge, pen_second_ridge, pen_lambda_lasso = optimize(train_data, validate_data, model, objective, train_covariates=train_covariates, penalty_params = penalty_params, lambda_penalty_params=lambda_penalty_params,
                                                                                                                       learning_rate=learning_rate, iterations = iterations, verbose=verbose, patience=patience, min_delta=min_delta) # Run training
 
 

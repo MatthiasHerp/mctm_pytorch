@@ -250,7 +250,7 @@ def run_deBoor(x, t, c, p):
 
 # Bspline Prediction using the deBoor algorithm
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None,
-                       covariate=False, params_covariate=False):
+                       covariate=False, params_covariate=False, dev=False):
 
     # Adjust polynomial range to be a bit wider
     # Empirically found that this helps with the fit
@@ -265,6 +265,10 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     knots = torch.tensor(np.linspace(polynomial_range[0]-order*distance_between_knots,
                                      polynomial_range[1]+order*distance_between_knots,
                                      n+4), dtype=torch.float32)
+
+    if dev is not False:
+        knots.to(dev)
+
 
     #input_a_clone = (torch.sigmoid(input_a_clone/((polynomial_range[1] - polynomial_range[0])) * 10) - 0.5) * (polynomial_range[1] - polynomial_range[0])/2
     #input_a_clone = custom_sigmoid(input=input_a_clone, min=polynomial_range[0], max=polynomial_range[1])
@@ -296,6 +300,9 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     # Adding Covariate in a GAM manner
     if covariate is not False:
         params_covariate_restricted = params_covariate.clone().contiguous()
+
+        if dev is not False:
+            params_covariate_restricted.to(dev)
 
         knots_covariate = torch.tensor(np.linspace(0 - order * 1,
                                          1 + order * 1,

@@ -78,7 +78,7 @@ def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_f
     return multivariate_bernstein_basis
 
 
-def restrict_parameters(params_a, covariate, degree, monotonically_increasing):
+def restrict_parameters(params_a, covariate, degree, monotonically_increasing,dev=False):
     if monotonically_increasing:
     # check out Bayesian CTM book 2.1 theorem!!!
 
@@ -99,7 +99,11 @@ def restrict_parameters(params_a, covariate, degree, monotonically_increasing):
                 # exp() for all parameters except the intercept
                 params_restricted[1:,num_var] = torch.exp(params_restricted[1:,num_var])
                 # Summing up of each value with all its prior values
-                params_restricted[:,num_var] = torch.matmul(params_restricted[:,num_var],torch.triu(torch.ones(degree+1,degree+1)))
+                summing_matrix = torch.ones(degree+1, degree+1)
+                if dev is not False:
+                    summing_matrix.to(dev)
+                summing_matrix = torch.triu(summing_matrix)
+                params_restricted[:,num_var] = torch.matmul(params_restricted[:,num_var],summing_matrix)
     else:
         params_restricted = params_a
 

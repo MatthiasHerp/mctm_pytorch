@@ -8,6 +8,7 @@ from python_nf_mctm.training_helpers import *
 import optuna
 from optuna.samplers import TPESampler
 
+#TODO: y_validate determined here so no need to pass it in
 def run_hyperparameter_tuning(y_train: torch.Tensor,
                               y_validate: torch.Tensor,
                           poly_span_abs: float,
