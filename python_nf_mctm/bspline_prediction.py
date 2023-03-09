@@ -6,11 +6,11 @@ from python_nf_mctm.splines_utils import adjust_ploynomial_range, ReLULeR, custo
 def x_in_intervall(x, i, t):
     # if t[i] <= x < t[i+1] then this is one, otherwise zero
     return torch.where(t[i] <= x,
-                       torch.FloatTensor([1.0]),
-                       torch.FloatTensor([0.0])) * \
+                       torch.FloatTensor([1.0], device=x.device),
+                       torch.FloatTensor([0.0], device=x.device)) * \
            torch.where(x < t[i+1],
-                       torch.FloatTensor([1.0]),
-                       torch.FloatTensor([0.0]))
+                       torch.FloatTensor([1.0], device=x.device),
+                       torch.FloatTensor([0.0], device=x.device))
 
 def B(x, k, i, t):
     """
@@ -102,15 +102,15 @@ def Naive(x, t, c, p):
 
 from python_nf_mctm.bernstein_prediction import kron
 
-def Naive_Basis(x, polynomial_range, degree, span_factor,derivativ=0):
+def Naive_Basis(x, polynomial_range, degree, span_factor,derivativ=0, device=None):
     order = 2
     p = order
     n = degree + 1
     distance_between_knots = (polynomial_range[1] - polynomial_range[0]) * span_factor / (n - 1)
 
-    knots = torch.tensor(np.linspace(polynomial_range[0] - order * distance_between_knots,
+    knots = torch.linspace(polynomial_range[0] - order * distance_between_knots,
                                      polynomial_range[1] + order * distance_between_knots,
-                                     n + 4), dtype=torch.float32)
+                                     n + 4, dtype=torch.float32, device=device)
     t = knots
 
 
@@ -122,20 +122,20 @@ def Naive_Basis(x, polynomial_range, degree, span_factor,derivativ=0):
 
 
 
-def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=0):
+def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=0, device=None):
     # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     if covariate is not False:
-        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1)*(degree+1), input.size(1)))
+        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1)*(degree+1), input.size(1)), device=device)
     else:
-        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)))
+        multivariate_bspline_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)), device=device)
 
     for var_num in range(input.size(1)):
-        input_basis = Naive_Basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ)
+        input_basis = Naive_Basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ, device=device)
         if covariate is not False:
             #covariate are transformed between 0 and 1 before inputting into the model
             # dont take the derivativ w.r.t to the covariate when computing jacobian of the transformation
-            covariate_basis = Naive_Basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=derivativ)
+            covariate_basis = Naive_Basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1],device=device), span_factor=span_factor, derivativ=derivativ, device=device)
             basis = kron(input_basis, covariate_basis)
         else:
             basis = input_basis
@@ -176,7 +176,7 @@ class Naive_vmap():
         def B_vmap(i,obs_num):
             if self.knots[obs_num] < self.t[i - self.p] or self.knots[obs_num] > self.t[i + self.p]:
                 return torch.FloatTensor([0.0])
-            if k == 0:
+            if k == 0: #TODO: error here
                 return x_in_intervall(x[obs_num], i,
                                       self.t)  # torch.FloatTensor([1.0]) if t[i] <= x < t[i+1] else torch.FloatTensor([0.0])
             if self.t[i + self.p] == self.t[i]:
@@ -250,7 +250,7 @@ def run_deBoor(x, t, c, p):
 
 # Bspline Prediction using the deBoor algorithm
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None,
-                       covariate=False, params_covariate=False, dev=False):
+                       covariate=False, params_covariate=False, device=None):
 
     # Adjust polynomial range to be a bit wider
     # Empirically found that this helps with the fit
@@ -262,13 +262,9 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     n = degree+1
     distance_between_knots = (polynomial_range[1] - polynomial_range[0]) / (n-1)
 
-    knots = torch.tensor(np.linspace(polynomial_range[0]-order*distance_between_knots,
+    knots = torch.linspace(polynomial_range[0]-order*distance_between_knots,
                                      polynomial_range[1]+order*distance_between_knots,
-                                     n+4), dtype=torch.float32)
-
-    if dev is not False:
-        knots.to(dev)
-
+                                     n+4, dtype=torch.float32, device=device)
 
     #input_a_clone = (torch.sigmoid(input_a_clone/((polynomial_range[1] - polynomial_range[0])) * 10) - 0.5) * (polynomial_range[1] - polynomial_range[0])/2
     #input_a_clone = custom_sigmoid(input=input_a_clone, min=polynomial_range[0], max=polynomial_range[1])
@@ -301,12 +297,12 @@ def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonicall
     if covariate is not False:
         params_covariate_restricted = params_covariate.clone().contiguous()
 
-        if dev is not False:
-            params_covariate_restricted.to(dev)
+        #if dev is not False:
+        #    params_covariate_restricted.to(dev)
 
-        knots_covariate = torch.tensor(np.linspace(0 - order * 1,
+        knots_covariate = torch.linspace(0 - order * 1,
                                          1 + order * 1,
-                                         n + 4), dtype=torch.float32)
+                                         n + 4, dtype=torch.float32, device=device)
 
         prediction_covariate = run_deBoor(x=covariate,
                                 t=knots_covariate,

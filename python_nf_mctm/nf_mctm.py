@@ -154,7 +154,7 @@ class NF_MCTM(nn.Module):
                  spline_transformation="bernstein", spline_decorrelation="bernstein",
                  degree_transformations=10, degree_decorrelation=12, span_factor=0.1, span_restriction="None",
                  number_covariates=False, num_decorr_layers=3, list_comprehension=False,
-                 dev=False): #normalisation_layer=None
+                 device=None): #normalisation_layer=None
         super(NF_MCTM, self).__init__()
         self.polynomial_range = polynomial_range
         self.number_variables = number_variables
@@ -168,15 +168,15 @@ class NF_MCTM(nn.Module):
         self.span_factor = span_factor
         self.span_restriction = span_restriction
 
-        self.dev = dev
+        self.device = device
 
         # Repeat polynomial ranges for all variables as this is the range for the bsplines essentially
         polynomial_range_transformation = polynomial_range.repeat(1,self.number_variables)
         polynomial_range_decorrelation = polynomial_range.repeat(1,self.number_variables)
 
-        if self.dev is not False:
-            polynomial_range_transformation.to(self.dev)
-            polynomial_range_decorrelation.to(self.dev)
+
+        #polynomial_range_transformation.to(self.device)
+        #polynomial_range_decorrelation.to(self.device)
 
         self.number_covariates = number_covariates
 
@@ -189,7 +189,7 @@ class NF_MCTM(nn.Module):
 
         self.transformation = Transformation(degree=self.degree_transformations, number_variables=self.number_variables,
                                  polynomial_range=polynomial_range_transformation, span_factor=self.span_factor,
-                                 number_covariates=self.number_covariates, spline=spline_transformation, dev=self.dev)
+                                 number_covariates=self.number_covariates, spline=spline_transformation, device=self.device)
         ##self.l12 = ReLULeR(polynomial_range_abs=self.polynomial_range[1])
         #self.l2 = Decorrelation(degree=self.degree_decorrelation, number_variables=self.number_variables,
         #                        polynomial_range=polynomial_range_decorrelation, span_factor=self.span_factor,
@@ -223,7 +223,7 @@ class NF_MCTM(nn.Module):
                                 span_restriction=self.span_restriction, spline=spline_decorrelation,
                                 number_covariates=self.number_covariates,
                                 list_comprehension = self.list_comprehension,
-                                dev = self.dev) for i in range(self.number_decorrelation_layers)])
+                                device = self.device) for i in range(self.number_decorrelation_layers)])
 
     def forward(self, y, covariate=False, train=True, evaluate=True):
         # Normalisation
@@ -244,13 +244,10 @@ class NF_MCTM(nn.Module):
 
             #output = self.l12(output)
 
-            lambda_matrix_global = torch.eye(self.number_variables)
+            lambda_matrix_global = torch.eye(self.number_variables, device=self.device)
             second_order_ridge_pen_global = 0
             first_order_ridge_pen_global = 0
             param_ridge_pen_global = 0
-
-            if self.dev is not False:
-                lambda_matrix_global.to(self.dev)
 
             for i in range(self.number_decorrelation_layers):
 
@@ -313,10 +310,7 @@ class NF_MCTM(nn.Module):
 
 
     def sample(self, n_samples, covariate=False):
-        z = torch.distributions.Normal(0, 1).sample((n_samples, self.number_variables))
-
-        if self.dev is not False:
-            z.to(self.dev)
+        z = torch.distributions.Normal(0, 1).sample((n_samples, self.number_variables)).to(device=self.device)
 
         for i in range(self.number_decorrelation_layers - 1, -1, -1):
             z = self.flip(z)

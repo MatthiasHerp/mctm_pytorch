@@ -16,7 +16,7 @@ def b(v, n, x):
     return torch_binom(n, v) * x**v * (1 - x)**(n - v)
 
 
-def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=0):
+def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=0, device=None):
     """
 
     :param x:
@@ -36,7 +36,7 @@ def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=
 
     n = degree
     if derivativ==0:
-        return torch.vstack([b(torch.FloatTensor([v]), torch.FloatTensor([degree]), x) for v in range(degree + 1)]).T
+        return torch.vstack([b(torch.FloatTensor([v], device=device), torch.FloatTensor([degree]), x) for v in range(degree + 1)]).T
     #TODO: write theory on why this is correct way to do the derivativ even when we have a covariate
     elif derivativ==1:
         # The Bernstein polynomial basis: A centennial retrospective p.391 (17)
@@ -55,7 +55,7 @@ def kron(input_basis, covariate_basis):
     return torch.vstack([torch.kron(input_basis[i,:],covariate_basis.T[:,i]) for i in range(input_basis.size(0))])
 
 
-def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_factor, derivativ=0, covariate=False):
+def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_factor, derivativ=0, covariate=False, device=None):
     # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     if covariate is not False:
@@ -64,11 +64,11 @@ def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_f
         multivariate_bernstein_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)))
 
     for var_num in range(input.size(1)):
-        input_basis = compute_bernstein_basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor,derivativ=derivativ)
+        input_basis = compute_bernstein_basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ, device=device)
         if covariate is not False:
             #covariate are transformed between 0 and 1 before inputting into the model
             # dont take the derivativ w.r.t to the covariate when computing jacobian of the transformation
-            covariate_basis = compute_bernstein_basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=0)
+            covariate_basis = compute_bernstein_basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=0, device=device)
             basis = kron(input_basis, covariate_basis)
         else:
             basis = input_basis

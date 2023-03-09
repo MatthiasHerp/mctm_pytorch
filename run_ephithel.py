@@ -40,7 +40,8 @@ def run_epithel_study(data_dims: int,
                       list_comprehension: bool = False,
                       optimizer: str = "LBFGS",
                       num_decorr_layers: int = 6,
-                      spline_transformation="bernstein"):
+                      spline_transformation="bernstein",
+                      device=None):
 
     covariate_exists=False
     number_covariates = 0
@@ -89,8 +90,8 @@ def run_epithel_study(data_dims: int,
         training_idx, test_idx = indices[:sub_train_obs], indices[sub_train_obs:]
         y_sub_train, y_validate = y_train[training_idx, :], y_train[test_idx, :]
 
-        y_sub_train = torch.tensor(y_sub_train, dtype=torch.float32)
-        y_validate = torch.tensor(y_validate, dtype=torch.float32)
+        y_sub_train = torch.tensor(y_sub_train, dtype=torch.float32, device=device)
+        y_validate = torch.tensor(y_validate, dtype=torch.float32, device=device)
 
         # Running Cross validation to identify hyperparameters
         results = run_hyperparameter_tuning(y_sub_train,
@@ -178,10 +179,10 @@ def run_epithel_study(data_dims: int,
     mlflow.log_param(key="cross_validation_folds", value=cross_validation_folds)
 
     # Defining the model
-    poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
+    poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]], device=device)
     penalty_params = torch.tensor([penvalueridge,
                                    penfirstridge,
-                                   pensecondridge])
+                                   pensecondridge], device=device)
 
     # comes out of CV aas nan which then doe
     # normalisation_layer = None
@@ -189,10 +190,19 @@ def run_epithel_study(data_dims: int,
     y_train = torch.tensor(y_train)
     y_test = torch.tensor(y_test)
 
-    nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
-                      input_max=y_train.max(0).values,
+    # Splitting the data into sub_train and validation
+    indices = np.random.permutation(y_train.shape[0])
+    sub_train_obs = int(np.round(y_train.shape[0] * (1 - val_portion)))
+    training_idx, test_idx = indices[:sub_train_obs], indices[sub_train_obs:]
+    y_sub_train, y_validate = y_train[training_idx, :], y_train[test_idx, :]
+
+    y_sub_train = torch.tensor(y_sub_train, dtype=torch.float32, device=device)
+    y_validate = torch.tensor(y_validate, dtype=torch.float32, device=device)
+
+    nf_mctm = NF_MCTM(input_min=y_sub_train.min(0).values,
+                      input_max=y_sub_train.max(0).values,
                       polynomial_range=poly_range,
-                      number_variables=y_train.size()[1],
+                      number_variables=y_sub_train.size()[1],
                       spline_transformation=spline_transformation,
                       spline_decorrelation=spline_decorrelation,
                       degree_transformations=int(degree_transformations),
@@ -207,8 +217,10 @@ def run_epithel_study(data_dims: int,
     # Training the model
     loss_training_iterations, number_iterations, pen_value_ridge_final, pen_first_ridge_final, pen_second_ridge_final, \
     pen_lambda_lasso, training_time, fig_training = train(model=nf_mctm,
-                                                          train_data=y_train,
-                                                          train_covariates=x_train,
+                                                          train_data=y_sub_train,
+                                                          validate_data=y_validate,
+                                                          train_covariates=False,
+                                                          validate_covariates=False,
                                                           penalty_params=penalty_params,
                                                           lambda_penalty_params=lambda_penalty_params,
                                                           iterations=iterations,
@@ -385,7 +397,16 @@ def run_epithel_study(data_dims: int,
 
 if __name__ == "__main__":
 
-    #mlflow.create_experiment(name="ephithel_hyperpar_server2")
+    import torch
+
+    if torch.cuda.is_available():
+        device = "cuda:0"
+        print("running on cuda")
+    else:
+        device = "cpu"
+        print("running on cpu")
+
+        #mlflow.create_experiment(name="ephithel_hyperpar_server2")
     experiment = mlflow.get_experiment_by_name("ephithel_hyperpar")
 
     run_epithel_study(
@@ -397,8 +418,8 @@ if __name__ == "__main__":
             # Setting Hyperparameter Values
             seed_value=1,
             penvalueridge_list=[0],
-            penfirstridge_list=[0],
-            pensecondridge_list=[0],
+            penfirstridge_list=[0.021847138083227073],
+            pensecondridge_list=[0.04247392961503296],
             poly_span_abs=15,
             spline_transformation="bspline",
             spline_decorrelation="bspline",
@@ -406,11 +427,11 @@ if __name__ == "__main__":
             span_factor=0.1,
             span_factor_inverse=0.2,
             span_restriction="reluler",
-            iterations=10000,
+            iterations=100,
             iterations_hyperparameter_tuning=10000,
             iterations_inverse=1,
             learning_rate_list=[1.],
-            patience_list=[10],
+            patience_list=[5],
             min_delta_list=[1e-8],
             degree_transformations_list=[70],
             degree_decorrelation_list=[40],
@@ -418,11 +439,12 @@ if __name__ == "__main__":
             #normalisation_layer_list=[None],
             degree_inverse=120,
             monotonically_increasing_inverse=True,
-            hyperparameter_tuning=True,
+            hyperparameter_tuning=False,
             cross_validation_folds=5,
             n_samples=8000,
             list_comprehension=False,
-            num_decorr_layers=6)
+            num_decorr_layers=6,
+            device=device)
 
     #run_epithel_study(
     #    experiment_id= experiment.experiment_id,

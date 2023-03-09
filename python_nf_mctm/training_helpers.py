@@ -80,6 +80,7 @@ class EarlyStopper:
             #self.best_model_state = copy.deepcopy(model.state_dict())
             #self.min_loss = current_loss
             #self.counter = 0
+        print(self.counter)
 
         if current_loss < self.min_loss - self.min_delta:
             self.best_model_state = copy.deepcopy(model.state_dict())
@@ -138,6 +139,7 @@ def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penal
         scheduler = optim.lr_scheduler.StepLR(opt, step_size = 500, gamma = 0.8)
 
     loss_list = []
+    model_val = copy.deepcopy(model)
     for i in tqdm(range(iterations)):
         number_iterations = i
 
@@ -154,15 +156,26 @@ def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penal
             current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
         loss_list.append(current_loss.detach().numpy().item())
 
-        #model_val = copy.deepcopy(model)
-        #current_neg_log_likl_validation = -1*sum(model_val.log_likelihood(y_validate, covariate=validate_covariates))
+        #model_val.state_dict() = copy.deepcopy(model.state_dict())
+        #if i > 3000 and i % 10 == 0:
+        #    model_val.load_state_dict(model.state_dict())
+        #    current_neg_log_likl_validation = -1*torch.mean(model_val.log_likelihood(y_validate, covariate=validate_covariates))
+        #    current_loss = current_neg_log_likl_validation
+        #    print(current_neg_log_likl_validation)
+#
+        #    if early_stopper.early_stop(current_neg_log_likl_validation.detach().numpy(), model):  # current_loss
+        #        print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
+        #              "and min_delta", min_delta)
+        #        break
+
+        if early_stopper.early_stop(current_loss.detach().numpy(), model):  # current_loss
+            print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
+                  "and min_delta", min_delta)
+            break
 
         if verbose:
             print("Loss:",current_loss.item())
 
-        if early_stopper.early_stop(current_loss.detach().numpy(), model):
-            print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience, "and min_delta", min_delta)
-            break
 
     # Return the best model which is not necessarily the last model
     model.load_state_dict(early_stopper.best_model_state)
