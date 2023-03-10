@@ -50,7 +50,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 
 class Transformation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range, monotonically_increasing=True, spline="bernstein", span_factor=0.1,
-                 number_covariates=False, device=None):
+                 number_covariates=False): #device=None
         super().__init__()
         self.type = "transformation"
         self.degree  = degree
@@ -73,7 +73,7 @@ class Transformation(nn.Module):
 
         self.number_covariates = number_covariates
 
-        self.device = device
+        #self.device = device
 
         #self.span_factor_inverse = False
         #self.polynomial_range_inverse = False
@@ -145,22 +145,22 @@ class Transformation(nn.Module):
                                                                                      polynomial_range=polynomial_range,
                                                                                      span_factor=span_factor,
                                                                                      derivativ=0,
-                                                                                     covariate=covariate,
-                                                                                     device=self.device)
+                                                                                     covariate=covariate)
+                                                                                     #device=self.device)
 
             self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bernstein_basis(input=input,
                                                                                                  degree=degree,
                                                                                                  polynomial_range=polynomial_range,
                                                                                                  span_factor=span_factor,
                                                                                                  derivativ=1,
-                                                                                                 covariate=covariate,
-                                                                                                 device=self.device)
+                                                                                                 covariate=covariate)
+                                                                                                # device=self.device)
         elif spline == "bspline":
             print("generate basis",input.device)
-            self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, device=self.device)
+            self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False) #device=self.device)
 
             #TODO: need to implement first derivativ basis of bsplines
-            self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=1, device=self.device)
+            self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=1)# device=self.device)
 
     def compute_initial_parameters_transformation(self, input, covariate):
         """
@@ -174,14 +174,14 @@ class Transformation(nn.Module):
 
         # param dims: 0: basis, 1: variable
         if self.number_covariates==False:
-            params_tensor = torch.zeros((self.degree+1, self.number_variables), device=self.device)
+            params_tensor = torch.zeros((self.degree+1, self.number_variables), device=input.device)
         else:
-            params_tensor = torch.zeros((self.degree+1 + self.number_covariates*(self.degree+1), self.number_variables), device=self.device)
+            params_tensor = torch.zeros((self.degree+1 + self.number_covariates*(self.degree+1), self.number_variables), device=input.device)
 
         num_variables = input.size(1)
         for i in range(num_variables):
             y = input[:, i]
-            z_true = torch.distributions.Normal(loc=0, scale=1).icdf(torch.tensor(ECDF(y)(y)) - 0.0001).to(self.device)
+            z_true = torch.distributions.Normal(loc=0, scale=1).icdf(torch.tensor(ECDF(y)(y)) - 0.0001).to(input.device)
 
             #plt.hist(z_true)
             #plt.show()

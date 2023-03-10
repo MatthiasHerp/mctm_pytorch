@@ -215,10 +215,18 @@ def run_epithel_study(data_dims: int,
                       num_decorr_layers=num_decorr_layers,
                       device=device)
 
-    #parallelizing over multiple GPUs
-    #nf_mctm = nn.DataParallel(nf_mctm)
+    #RuntimeError: module must have its parameters and buffers on device cuda:0 (device_ids[0]) but found one of them on device: cpu
+    #when using cuda0
+    #nf_mctm = nf_mctm.to(device)
+    #however when using cuda1 once we put it in it does not work anymore
 
-    nf_mctm = nf_mctm.to(device)
+    #parallelizing over multiple GPUs
+    device_ids = [1]
+    print("device_ids",device_ids)
+    nf_mctm = nn.DataParallel(nf_mctm, device_ids=device_ids)
+
+
+    #nf_mctm = nf_mctm.to(device)
     # normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -421,7 +429,7 @@ if __name__ == "__main__":
 
     run_epithel_study(
             experiment_id = experiment.experiment_id,
-            data_dims=3,
+            data_dims=5,
             train_portion=0.8,
             val_portion=0.3,
             log_data=False,
@@ -438,7 +446,7 @@ if __name__ == "__main__":
             span_factor_inverse=0.2,
             span_restriction="reluler",
             iterations=50,
-            iterations_hyperparameter_tuning=50,
+            iterations_hyperparameter_tuning=100,
             iterations_inverse=1,
             learning_rate_list=[1.],
             patience_list=[5],
@@ -449,7 +457,7 @@ if __name__ == "__main__":
             #normalisation_layer_list=[None],
             degree_inverse=120,
             monotonically_increasing_inverse=True,
-            hyperparameter_tuning=True,
+            hyperparameter_tuning=False,
             cross_validation_folds=5,
             n_samples=8000,
             list_comprehension=True,

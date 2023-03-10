@@ -129,7 +129,7 @@ def Naive_Basis(x, polynomial_range, degree, span_factor,derivativ=0, device=Non
 
 
 
-def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=0, device=None):
+def compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=0): #device=None
     # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     #print("compute_multivariate_bspline_basis",device)
@@ -259,7 +259,7 @@ def run_deBoor(x, t, c, p):
 
 # Bspline Prediction using the deBoor algorithm
 def bspline_prediction(params_a, input_a, degree, polynomial_range, monotonically_increasing=False, derivativ=0, return_penalties=False, calc_method='deBoor', span_factor=0.1, span_restriction=None,
-                       covariate=False, params_covariate=False, device=None):
+                       covariate=False, params_covariate=False): #device=None
 
     # Adjust polynomial range to be a bit wider
     # Empirically found that this helps with the fit

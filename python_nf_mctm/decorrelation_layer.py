@@ -18,7 +18,7 @@ def compute_starting_values_bspline(degree,num_lambdas):
     return params
 
 def multivariable_lambda_prediction(input, degree, number_variables, params, polynomial_range, spline, inverse=False, span_factor=0.1, span_restriction="None",
-                                    covariate=False,params_covariate=False, list_comprehension=False, device=None):
+                                    covariate=False,params_covariate=False, list_comprehension=False): #device=None
 
     #steps
     output = input.clone()
@@ -61,8 +61,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                           span_factor=span_factor,
                                                           span_restriction=span_restriction,
                                                           covariate=covariate,
-                                                          params_covariate=params_covariate[:,covar_num],
-                                                          device=input.device)
+                                                          params_covariate=params_covariate[:,covar_num])
+                                                          #device=input.device)
 
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
@@ -106,8 +106,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       span_factor=span_factor,
                                                       span_restriction=span_restriction,
                                                       covariate=covariate,
-                                                      params_covariate=params_covariate[:,covar_num],
-                                                      device=input.device)
+                                                      params_covariate=params_covariate[:,covar_num])
+                                                      #device=input.device)
                     #second_order_ridge_pen_sum += second_order_ridge_pen_current
                     #first_order_ridge_pen_sum += first_order_ridge_pen_current
                     #param_ridge_pen_sum += param_ridge_pen_current
@@ -123,8 +123,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         return_penalties=True,
                                                         span_factor=span_factor,
                                                         covariate=covariate,
-                                                        params_covariate=params_covariate[:,covar_num],
-                                                        device=input.device)
+                                                        params_covariate=params_covariate[:,covar_num])
+                                                        #device=input.device)
                     #second_order_ridge_pen_sum += second_order_ridge_pen_current
                     #first_order_ridge_pen_sum += first_order_ridge_pen_current
                     #param_ridge_pen_sum += param_ridge_pen_current
@@ -202,8 +202,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                             span_factor=span_factor,
                             span_restriction=span_restriction,
                             covariate=covariate,
-                            params_covariate=params_covariate[:, covar_num],
-                            device=input.device)
+                            params_covariate=params_covariate[:, covar_num])
+                            #device=input.device)
                         second_order_ridge_pen_sum += second_order_ridge_pen_current
                         first_order_ridge_pen_sum += first_order_ridge_pen_current
                         param_ridge_pen_sum += param_ridge_pen_current
@@ -243,8 +243,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
 class Decorrelation(nn.Module):
     def __init__(self, degree, number_variables, polynomial_range, spline="bspline", span_factor=0.1, span_restriction="None",
-                 number_covariates=False, list_comprehension = False,
-                 device=None):
+                 number_covariates=False, list_comprehension = False): #device=None
         super().__init__()
         self.type = "decorrelation"
         self.degree  = degree
@@ -256,7 +255,7 @@ class Decorrelation(nn.Module):
         self.span_factor = span_factor
         self.span_restriction = span_restriction
 
-        self.device = device
+        #self.device = device
 
         self.params = compute_starting_values_bspline(self.degree, self.num_lambdas)
 
@@ -291,8 +290,8 @@ class Decorrelation(nn.Module):
                                                      span_restriction=self.span_restriction,
                                                      covariate = covariate,
                                                      params_covariate = self.params_covariate,
-                                                     list_comprehension = self.list_comprehension,
-                                                     device = self.device)
+                                                     list_comprehension = self.list_comprehension)
+                                                     #device = self.device)
         else:
             output = multivariable_lambda_prediction(input,
                                                      self.degree,
@@ -305,8 +304,8 @@ class Decorrelation(nn.Module):
                                                      span_restriction=self.span_restriction,
                                                      covariate = covariate,
                                                      params_covariate = self.params_covariate,
-                                                     list_comprehension=self.list_comprehension,
-                                                     device = self.device)
+                                                     list_comprehension=self.list_comprehension)
+                                                     #device = self.device)
 
         if return_log_d and return_penalties:
             return output, log_d, second_order_ridge_pen_sum, first_order_ridge_pen_sum, param_ridge_pen_sum, lambda_matrix

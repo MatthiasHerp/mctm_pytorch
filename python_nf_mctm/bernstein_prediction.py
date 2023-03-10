@@ -17,7 +17,7 @@ def b(v, n, x):
     return torch_binom(n, v) * x**v * (1 - x)**(n - v)
 
 
-def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=0, device=None):
+def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=0): #device=None
     """
 
     :param x:
@@ -61,7 +61,7 @@ def kron(input_basis, covariate_basis):
     return torch.vstack([torch.kron(input_basis[i,:],covariate_basis.T[:,i]) for i in range(input_basis.size(0))])
 
 
-def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_factor, derivativ=0, covariate=False, device=None):
+def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_factor, derivativ=0, covariate=False): #device=None
     # We essentially do a tensor prodcut of two splines! : https://en.wikipedia.org/wiki/Bernstein_polynomial#Generalizations_to_higher_dimension
 
     if covariate is not False:
@@ -70,11 +70,11 @@ def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_f
         multivariate_bernstein_basis = torch.empty(size=(input.size(0), (degree+1), input.size(1)))
 
     for var_num in range(input.size(1)):
-        input_basis = compute_bernstein_basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ, device=device)
+        input_basis = compute_bernstein_basis(x=input[:, var_num], degree=degree, polynomial_range=polynomial_range[:, var_num], span_factor=span_factor, derivativ=derivativ) #device=device
         if covariate is not False:
             #covariate are transformed between 0 and 1 before inputting into the model
             # dont take the derivativ w.r.t to the covariate when computing jacobian of the transformation
-            covariate_basis = compute_bernstein_basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=0, device=device)
+            covariate_basis = compute_bernstein_basis(x=covariate, degree=degree, polynomial_range=torch.tensor([0,1]), span_factor=span_factor, derivativ=0) #device=device
             basis = kron(input_basis, covariate_basis)
         else:
             basis = input_basis
@@ -84,7 +84,7 @@ def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_f
     return multivariate_bernstein_basis
 
 
-def restrict_parameters(params_a, covariate, degree, monotonically_increasing,device=None):
+def restrict_parameters(params_a, covariate, degree, monotonically_increasing,device=None): #####Requires device as input not passed
     if monotonically_increasing:
     # check out Bayesian CTM book 2.1 theorem!!!
 
@@ -105,7 +105,7 @@ def restrict_parameters(params_a, covariate, degree, monotonically_increasing,de
                 # exp() for all parameters except the intercept
                 params_restricted[1:,num_var] = torch.exp(params_restricted[1:,num_var])
                 # Summing up of each value with all its prior values
-                summing_matrix = torch.ones(degree+1, degree+1, device=params_a.device)
+                summing_matrix = torch.ones(degree+1, degree+1, device=device) #the input.device is npassed here
                 #if dev is not False:
                 #    summing_matrix.to(dev)
                 summing_matrix = torch.triu(summing_matrix)
@@ -126,8 +126,7 @@ def bernstein_prediction(multivariate_bernstein_basis, multivariate_bernstein_ba
                          monotonically_increasing=False,
                          derivativ=0,
                          #span_factor=0.1,
-                         covariate=False,
-                         device=None):
+                         covariate=False): #device=None
 
     #if covariate is not False:
     #    input_basis = compute_bernstein_basis(input_a, degree)
