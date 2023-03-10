@@ -13,6 +13,7 @@ def torch_binom(n, v):
 # https://en.wikipedia.org/wiki/Bernstein_polynomial
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.BPoly.html
 def b(v, n, x):
+    #print("torch_binom(n, v)", torch_binom(n, v).to(x.device))
     return torch_binom(n, v) * x**v * (1 - x)**(n - v)
 
 
@@ -34,14 +35,19 @@ def compute_bernstein_basis(x, degree, polynomial_range, span_factor, derivativ=
     normalizing_range = polynomial_range[1] - polynomial_range[0]
     x = (x - polynomial_range[0]) / (normalizing_range)
 
+    #print("x", x.device)
+    #print("normalizing_range", normalizing_range.device)
+
     n = degree
     if derivativ==0:
-        return torch.vstack([b(torch.FloatTensor([v], device=device), torch.FloatTensor([degree]), x) for v in range(degree + 1)]).T
+        return torch.vstack([b(torch.FloatTensor([v]).to(x.device), torch.FloatTensor([degree]).to(x.device), x) for v in range(degree + 1)]).T
     #TODO: write theory on why this is correct way to do the derivativ even when we have a covariate
     elif derivativ==1:
         # The Bernstein polynomial basis: A centennial retrospective p.391 (17)
         # aded the normalizing range due to the standartisation transformation
-        return torch.vstack([1/normalizing_range * torch.FloatTensor([n]) * (b(torch.FloatTensor([v-1]), torch.FloatTensor([n-1]), x) - b(torch.FloatTensor([v]), torch.FloatTensor([n-1]), x)) for v in range(n+1)]).T
+        return torch.vstack([1/normalizing_range.to(x.device) * torch.FloatTensor([n]).to(x.device) *
+                             (b(torch.FloatTensor([v-1]).to(x.device), torch.FloatTensor([n-1]).to(x.device), x) -
+                              b(torch.FloatTensor([v]).to(x.device), torch.FloatTensor([n-1]).to(x.device), x)) for v in range(n+1)]).T
 
 
 def kron(input_basis, covariate_basis):
@@ -78,7 +84,7 @@ def compute_multivariate_bernstein_basis(input, degree, polynomial_range, span_f
     return multivariate_bernstein_basis
 
 
-def restrict_parameters(params_a, covariate, degree, monotonically_increasing,dev=False):
+def restrict_parameters(params_a, covariate, degree, monotonically_increasing,device=None):
     if monotonically_increasing:
     # check out Bayesian CTM book 2.1 theorem!!!
 
@@ -99,9 +105,9 @@ def restrict_parameters(params_a, covariate, degree, monotonically_increasing,de
                 # exp() for all parameters except the intercept
                 params_restricted[1:,num_var] = torch.exp(params_restricted[1:,num_var])
                 # Summing up of each value with all its prior values
-                summing_matrix = torch.ones(degree+1, degree+1)
-                if dev is not False:
-                    summing_matrix.to(dev)
+                summing_matrix = torch.ones(degree+1, degree+1, device=params_a.device)
+                #if dev is not False:
+                #    summing_matrix.to(dev)
                 summing_matrix = torch.triu(summing_matrix)
                 params_restricted[:,num_var] = torch.matmul(params_restricted[:,num_var],summing_matrix)
     else:
@@ -120,7 +126,8 @@ def bernstein_prediction(multivariate_bernstein_basis, multivariate_bernstein_ba
                          monotonically_increasing=False,
                          derivativ=0,
                          #span_factor=0.1,
-                         covariate=False):
+                         covariate=False,
+                         device=None):
 
     #if covariate is not False:
     #    input_basis = compute_bernstein_basis(input_a, degree)
@@ -130,7 +137,7 @@ def bernstein_prediction(multivariate_bernstein_basis, multivariate_bernstein_ba
     #    basis = compute_bernstein_basis(input_a, degree)
 #
 
-    params_restricted = restrict_parameters(params_a, covariate, degree, monotonically_increasing)
+    params_restricted = restrict_parameters(params_a, covariate, degree, monotonically_increasing, device=multivariate_bernstein_basis.device)
 
     #if monotonically_increasing:
     ## check out Bayesian CTM book 2.1 theorem!!!

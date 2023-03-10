@@ -156,10 +156,11 @@ class Transformation(nn.Module):
                                                                                                  covariate=covariate,
                                                                                                  device=self.device)
         elif spline == "bspline":
-            self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False)
+            print("generate basis",input.device)
+            self.multivariate_bernstein_basis = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, device=self.device)
 
             #TODO: need to implement first derivativ basis of bsplines
-            self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=1)
+            self.multivariate_bernstein_basis_derivativ_1 = compute_multivariate_bspline_basis(input, degree, polynomial_range, span_factor, covariate=False, derivativ=1, device=self.device)
 
     def compute_initial_parameters_transformation(self, input, covariate):
         """
@@ -281,15 +282,15 @@ class Transformation(nn.Module):
         # = 0
 
         if derivativ==0:
-            basis = self.multivariate_bernstein_basis.to(self.device)
+            basis = self.multivariate_bernstein_basis.to(input.device)
         elif derivativ==1:
-            basis = self.multivariate_bernstein_basis_derivativ_1.to(self.device)
+            basis = self.multivariate_bernstein_basis_derivativ_1.to(input.device)
 
         #if self.spline == "bernstein":
         if not inverse:
-            params_restricted = restrict_parameters(params_a=self.params, covariate=self.number_covariates, degree=self.degree, monotonically_increasing=self.monotonically_increasing)
+            params_restricted = restrict_parameters(params_a=self.params, covariate=self.number_covariates, degree=self.degree, monotonically_increasing=self.monotonically_increasing, device=input.device)
         else:
-            params_restricted = restrict_parameters(params_a=self.params_inverse, covariate=self.number_covariates, degree=self.degree_inverse, monotonically_increasing=self.monotonically_increasing_inverse)
+            params_restricted = restrict_parameters(params_a=self.params_inverse, covariate=self.number_covariates, degree=self.degree_inverse, monotonically_increasing=self.monotonically_increasing_inverse, device=input.device)
         # Explanation:
         # multivariate_bernstein_basis: 0: observation, 1: basis, 2: variable
         # params: 0: basis, 1: variable
@@ -372,7 +373,7 @@ class Transformation(nn.Module):
 
         input_space = torch.zeros((100000, self.number_variables), dtype=torch.float32)
         for var_number in range(self.number_variables):
-            input_space[:, var_number] = torch.linspace(input[:,var_number].min(),input[:,var_number].max(),100000,device=self.device)
+            input_space[:, var_number] = torch.linspace(input[:,var_number].min(),input[:,var_number].max(),100000,device=input.device)
 
         #input_space = torch.vstack([torch.linspace(input[:,0].min(),input[:,0].max(),10000),
         #                            torch.linspace(input[:,1].min(),input[:,1].max(),10000)]).T
@@ -382,13 +383,13 @@ class Transformation(nn.Module):
         else:
             output_space = self.forward(input_space)
 
-        polynomial_range_inverse = torch.zeros((2, self.number_variables), dtype=torch.float32, device=self.device)
+        polynomial_range_inverse = torch.zeros((2, self.number_variables), dtype=torch.float32, device=input.device)
 
         for var_number in range(self.number_variables):
             span_var_number = output_space[:, var_number].max() - output_space[:, var_number].min()
             polynomial_range_inverse[:, var_number] = torch.tensor([output_space[:, var_number].min() - span_var_number*span_factor_inverse,
                                                                     output_space[:, var_number].max() + span_var_number*span_factor_inverse],
-                                                                   dtype=torch.float32, device=self.device)
+                                                                   dtype=torch.float32, device=input.device)
 
         #span_0 = output_space[:, 0].max() - output_space[:, 0].min()
         #span_1 = output_space[:, 1].max() - output_space[:, 1].min()

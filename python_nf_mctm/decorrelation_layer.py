@@ -32,7 +32,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
     # Matrix dimensions:
     # axis 0: number of samples
     # axis 1, 2: number of variables e.g. the lambda matrix of each particular sample
-    lambda_matrix_a = torch.eye(number_variables, device=device).expand(output.size()[0],number_variables,number_variables)
+    lambda_matrix_a = torch.eye(number_variables, device=input.device).expand(output.size()[0],number_variables,number_variables)
 
     lambda_matrix = lambda_matrix_a.clone()
 
@@ -62,7 +62,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                           span_restriction=span_restriction,
                                                           covariate=covariate,
                                                           params_covariate=params_covariate[:,covar_num],
-                                                          device=device)
+                                                          device=input.device)
 
                 elif spline == "bernstein":
                     lambda_value = bernstein_prediction(params[:, params_index],
@@ -107,7 +107,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                       span_restriction=span_restriction,
                                                       covariate=covariate,
                                                       params_covariate=params_covariate[:,covar_num],
-                                                      device=device)
+                                                      device=input.device)
                     #second_order_ridge_pen_sum += second_order_ridge_pen_current
                     #first_order_ridge_pen_sum += first_order_ridge_pen_current
                     #param_ridge_pen_sum += param_ridge_pen_current
@@ -123,7 +123,8 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                                                         return_penalties=True,
                                                         span_factor=span_factor,
                                                         covariate=covariate,
-                                                        params_covariate=params_covariate[:,covar_num])
+                                                        params_covariate=params_covariate[:,covar_num],
+                                                        device=input.device)
                     #second_order_ridge_pen_sum += second_order_ridge_pen_current
                     #first_order_ridge_pen_sum += first_order_ridge_pen_current
                     #param_ridge_pen_sum += param_ridge_pen_current
@@ -157,7 +158,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
 
             res = [forward_pass_col(var_num) for var_num in range(number_variables)]
 
-            output += torch.vstack([res[var_num][0] for var_num in range(number_variables)]).T
+            output += torch.vstack([res[var_num][0].to(input.device) for var_num in range(number_variables)]).T
 
             second_order_ridge_pen_sum = sum(res[var_num][1] for var_num in range(number_variables))
             first_order_ridge_pen_sum = sum(res[var_num][2] for var_num in range(number_variables))
@@ -202,7 +203,7 @@ def multivariable_lambda_prediction(input, degree, number_variables, params, pol
                             span_restriction=span_restriction,
                             covariate=covariate,
                             params_covariate=params_covariate[:, covar_num],
-                            device=device)
+                            device=input.device)
                         second_order_ridge_pen_sum += second_order_ridge_pen_current
                         first_order_ridge_pen_sum += first_order_ridge_pen_current
                         param_ridge_pen_sum += param_ridge_pen_current

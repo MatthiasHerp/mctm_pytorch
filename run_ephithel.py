@@ -90,8 +90,8 @@ def run_epithel_study(data_dims: int,
         training_idx, test_idx = indices[:sub_train_obs], indices[sub_train_obs:]
         y_sub_train, y_validate = y_train[training_idx, :], y_train[test_idx, :]
 
-        y_sub_train = torch.tensor(y_sub_train, dtype=torch.float32, device=device)
-        y_validate = torch.tensor(y_validate, dtype=torch.float32, device=device)
+        y_sub_train = torch.tensor(y_sub_train, dtype=torch.float32)#, device=device)
+        y_validate = torch.tensor(y_validate, dtype=torch.float32)#, device=device)
 
         # Running Cross validation to identify hyperparameters
         results = run_hyperparameter_tuning(y_sub_train,
@@ -104,7 +104,8 @@ def run_epithel_study(data_dims: int,
                                             x_train = x_train,
                                             x_validate = x_validate,
                                             tune_precision_matrix_penalty=tune_precision_matrix_penalty,
-                                            cross_validation_folds=cross_validation_folds) #normalisation_layer_list
+                                            cross_validation_folds=cross_validation_folds,
+                                            device=device) #normalisation_layer_list
 
         fig_hyperparameter_tuning_cooordinate = optuna.visualization.plot_parallel_coordinate(results)
         fig_hyperparameter_tuning_contour = optuna.visualization.plot_contour(results)
@@ -179,10 +180,10 @@ def run_epithel_study(data_dims: int,
     mlflow.log_param(key="cross_validation_folds", value=cross_validation_folds)
 
     # Defining the model
-    poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]], device=device)
+    poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])#.to(device)
     penalty_params = torch.tensor([penvalueridge,
                                    penfirstridge,
-                                   pensecondridge], device=device)
+                                   pensecondridge])#.to(device)
 
     # comes out of CV aas nan which then doe
     # normalisation_layer = None
@@ -211,7 +212,13 @@ def run_epithel_study(data_dims: int,
                       span_restriction=span_restriction,
                       number_covariates=number_covariates,
                       list_comprehension=list_comprehension,
-                      num_decorr_layers=num_decorr_layers)
+                      num_decorr_layers=num_decorr_layers,
+                      device=device)
+
+    #parallelizing over multiple GPUs
+    #nf_mctm = nn.DataParallel(nf_mctm)
+
+    nf_mctm = nf_mctm.to(device)
     # normalisation_layer=normalisation_layer)
 
     # Training the model
@@ -230,10 +237,12 @@ def run_epithel_study(data_dims: int,
                                                           verbose=False,
                                                           optimizer=optimizer)
 
-
+    y_sub_train = y_sub_train.cpu()
+    nf_mctm = nf_mctm.cpu()
+    nf_mctm.device = None
 
     # Training the inverse of the model
-    fig_training_inverse = nf_mctm.transformation.approximate_inverse(input=y_train,
+    fig_training_inverse = nf_mctm.transformation.approximate_inverse(input=y_sub_train,
                                                           input_covariate=x_train,
                                                           spline_inverse=spline_inverse,
                                                           degree_inverse=degree_inverse,
@@ -402,12 +411,13 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         device = "cuda:0"
         print("running on cuda")
+        print("number of gpus:",torch.cuda.device_count())
     else:
         device = "cpu"
         print("running on cpu")
 
         #mlflow.create_experiment(name="ephithel_hyperpar_server2")
-    experiment = mlflow.get_experiment_by_name("ephithel_hyperpar")
+    experiment = mlflow.get_experiment_by_name("ephithel_hyperpar_server2")
 
     run_epithel_study(
             experiment_id = experiment.experiment_id,
@@ -427,8 +437,8 @@ if __name__ == "__main__":
             span_factor=0.1,
             span_factor_inverse=0.2,
             span_restriction="reluler",
-            iterations=100,
-            iterations_hyperparameter_tuning=10000,
+            iterations=50,
+            iterations_hyperparameter_tuning=50,
             iterations_inverse=1,
             learning_rate_list=[1.],
             patience_list=[5],
@@ -439,10 +449,10 @@ if __name__ == "__main__":
             #normalisation_layer_list=[None],
             degree_inverse=120,
             monotonically_increasing_inverse=True,
-            hyperparameter_tuning=False,
+            hyperparameter_tuning=True,
             cross_validation_folds=5,
             n_samples=8000,
-            list_comprehension=False,
+            list_comprehension=True,
             num_decorr_layers=6,
             device=device)
 

@@ -44,7 +44,7 @@ def objective(y, model, penalty_params, lambda_penalty_params: torch.Tensor =Fal
         # need to compute number of parameters to average correctly
         number_variables = y.size(1)
         number_lambda_matrix_entries = number_variables * (number_variables - 1) / 2
-        number_params_lambda = 3 * number_lambda_matrix_entries * model.degree_decorrelation
+        number_params_lambda = 3 * number_lambda_matrix_entries * 6#model.degree_decorrelation #ToDo: adjust so that it works with DataParallel, AttributeError: 'DataParallel' object has no attribute 'degree_decorrelation'
         # For decorrelatioon layer degree == number of parameters
 
         # We average the loss and the penalties
@@ -80,7 +80,7 @@ class EarlyStopper:
             #self.best_model_state = copy.deepcopy(model.state_dict())
             #self.min_loss = current_loss
             #self.counter = 0
-        print(self.counter)
+        #print(self.counter)
 
         if current_loss < self.min_loss - self.min_delta:
             self.best_model_state = copy.deepcopy(model.state_dict())
@@ -131,7 +131,7 @@ def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penal
     early_stopper = EarlyStopper(patience=patience, min_delta=min_delta, global_min_loss=global_min_loss)
 
     loss = closure()
-    loss.backward()
+    loss.mean().backward() #TODO: changed using https://discuss.pytorch.org/t/loss-backward-raises-error-grad-can-be-implicitly-created-only-for-scalar-outputs/12152
     options = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
 
     if optimizer == "Adam":
@@ -154,7 +154,7 @@ def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penal
             current_loss = loss
         elif optimizer == "LBFGS":
             current_loss, _, _, _, _, _, _, _ = opt.step(options) # Note: if options not included you get the error: if 'damping' not in options.keys(): AttributeError: 'function' object has no attribute 'keys'
-        loss_list.append(current_loss.detach().numpy().item())
+        loss_list.append(current_loss.cpu().detach().numpy().item())
 
         #model_val.state_dict() = copy.deepcopy(model.state_dict())
         #if i > 3000 and i % 10 == 0:
@@ -168,7 +168,7 @@ def optimize(y_train, y_validate, model, objective, penalty_params, lambda_penal
         #              "and min_delta", min_delta)
         #        break
 
-        if early_stopper.early_stop(current_loss.detach().numpy(), model):  # current_loss
+        if early_stopper.early_stop(current_loss.cpu().detach().numpy(), model):  # current_loss
             print("Early Stop at iteration", i, "with loss", current_loss.item(), "and patience", patience,
                   "and min_delta", min_delta)
             break

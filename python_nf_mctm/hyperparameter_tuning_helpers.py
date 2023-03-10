@@ -11,23 +11,24 @@ from optuna.samplers import TPESampler
 #TODO: y_validate determined here so no need to pass it in
 def run_hyperparameter_tuning(y_train: torch.Tensor,
                               y_validate: torch.Tensor,
-                          poly_span_abs: float,
-                          iterations: int,
-                          spline_decorrelation: str,
-                          penvalueridge_list: list,
-                          penfirstridge_list: list,
-                          pensecondridge_list: list,
-                          lambda_penalty_params_list: list,
-                          learning_rate_list: list,
-                          patience_list: list,
-                          min_delta_list: list,
-                          degree_transformations_list: list,
-                          degree_decorrelation_list: list,
-                          x_train: torch.Tensor = False,
-                          x_validate: torch.Tensor = False,
-                          tuning_mode="optuna",
-                          cross_validation_folds=False,
-                          tune_precision_matrix_penalty=False):
+                              poly_span_abs: float,
+                              iterations: int,
+                              spline_decorrelation: str,
+                              penvalueridge_list: list,
+                              penfirstridge_list: list,
+                              pensecondridge_list: list,
+                              lambda_penalty_params_list: list,
+                              learning_rate_list: list,
+                              patience_list: list,
+                              min_delta_list: list,
+                              degree_transformations_list: list,
+                              degree_decorrelation_list: list,
+                              x_train: torch.Tensor = False,
+                              x_validate: torch.Tensor = False,
+                              tuning_mode="optuna",
+                              cross_validation_folds=False,
+                              tune_precision_matrix_penalty=False,
+                              device=None):
                           #normalisation_layer_list: list):
     """
     Generates List of all combinations of hyperparameter values from lists
@@ -61,7 +62,8 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
         penvalueridge, penfirstridge, pensecondridge, lambda_penalty_params, learning_rate, \
         patience, min_delta, degree_transformations, degree_decorrelation  = hyperparameter_combinations_list[0]
 
-        def optuna_objective(trial):
+        def optuna_objective(trial, y_train=y_train, y_validate=y_validate):
+
             # Defining the model
             poly_range = torch.FloatTensor([[-poly_span_abs], [poly_span_abs]])
 
@@ -93,6 +95,10 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
             #https://stackoverflow.com/questions/63224426/how-can-i-cross-validate-by-pytorch-and-optuna
 
             if cross_validation_folds == False:
+
+                y_train = y_train.to(device)
+                y_validate = y_validate.to(device)
+
                 nf_mctm = NF_MCTM(input_min=y_train.min(0).values,
                                   input_max=y_train.max(0).values,
                                   polynomial_range=poly_range,
@@ -100,12 +106,17 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                                   spline_decorrelation=spline_decorrelation,
                                   degree_transformations=degree_transformations,
                                   degree_decorrelation=degree_decorrelation,
-                                  number_covariates=number_covariates)
+                                  number_covariates=number_covariates,
+                                  device=device)
                 # normalisation_layer=normalisation_layer)
+
+                nf_mctm = nf_mctm.to(device)
 
                 train(model=nf_mctm,
                       train_data=y_train,
+                      validate_data=y_validate,
                       train_covariates=x_train,
+                      validate_covariates=x_validate,
                       penalty_params=penalty_params,
                       lambda_penalty_params=lambda_penalty_params_opt,
                       iterations=iterations,
@@ -115,7 +126,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                       verbose=False,
                       return_report=False)  # no need for reporting and metrics,plots etc.
 
-                return nf_mctm.log_likelihood(y_validate, x_validate).detach().numpy().sum()
+                return nf_mctm.log_likelihood(y_validate, x_validate).cpu().detach().numpy().sum()
 
             else:
                 kf = KFold(n_splits=cross_validation_folds, shuffle=True)
@@ -131,6 +142,9 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                         x_train_cv = x_train[train_idx, :]
                         x_validate_cv = x_train[val_idx, :]
 
+                    y_train_cv = y_train_cv.to(device)
+                    y_validate_cv = y_validate_cv.to(device)
+
                     nf_mctm = NF_MCTM(input_min=y_train_cv.min(0).values,
                                       input_max=y_train_cv.max(0).values,
                                       polynomial_range=poly_range,
@@ -138,13 +152,22 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                                       spline_decorrelation=spline_decorrelation,
                                       degree_transformations=degree_transformations,
                                       degree_decorrelation=degree_decorrelation,
-                                      number_covariates=number_covariates)
+                                      number_covariates=number_covariates,
+                                      device=device)
                     # normalisation_layer=normalisation_layer)
+
+                    nf_mctm = nf_mctm.to(device)
+
+                    #print("nf_mctm",nf_mctm.device)
+                    #print("y_train_cv", y_train_cv.device)
+                    #print("y_validate_cv", y_validate_cv.device)
 
                     train(model=nf_mctm,
                           train_data=y_train_cv,
+                          validate_data=y_validate_cv,
                           train_covariates=x_train_cv,
-                          penalty_params=penalty_params,
+                          validate_covariates=x_validate_cv,
+                          penalty_params=penalty_params.to(device),
                           lambda_penalty_params=lambda_penalty_params_opt,
                           iterations=iterations,
                           learning_rate=learning_rate,
@@ -153,7 +176,7 @@ def run_hyperparameter_tuning(y_train: torch.Tensor,
                           verbose=False,
                           return_report=False)
 
-                    log_likelihoods.append(nf_mctm.log_likelihood(y_validate_cv, x_validate_cv).detach().numpy().sum())
+                    log_likelihoods.append(nf_mctm.log_likelihood(y_validate_cv, x_validate_cv).cpu().detach().numpy().sum())
                 return np.mean(log_likelihoods)
 
         # docs: https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html#optuna.samplers.TPESampler

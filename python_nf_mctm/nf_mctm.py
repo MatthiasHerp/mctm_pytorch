@@ -244,7 +244,7 @@ class NF_MCTM(nn.Module):
 
             #output = self.l12(output)
 
-            lambda_matrix_global = torch.eye(self.number_variables, device=self.device)
+            lambda_matrix_global = torch.eye(self.number_variables, device=output.device)
             second_order_ridge_pen_global = 0
             first_order_ridge_pen_global = 0
             param_ridge_pen_global = 0
